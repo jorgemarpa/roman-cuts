@@ -1,0 +1,8 @@
+.python-version
+site
+dist
+*__pycache__
+.pytest_cache
+.ruff_cache
+poetry.lock
+.mypy_cache
