@@ -44,7 +44,7 @@ def extract_average_WCS(file_list: list = []):
     """
     # read WCS keywords and values into a list of dictionaries for all times
     frame_wcs = []
-    for f in ff[:10]:
+    for f in file_list:
         hdu = fits.getheader(f)
         aux_wcs = {}
         for attr in WCS_ATTRS(hdu):
@@ -53,12 +53,15 @@ def extract_average_WCS(file_list: list = []):
 
     # take the median value of every keyword with numeric values
     df = pd.DataFrame(frame_wcs)
-    only_floats = (df.dtypes != object).values
-    df_avg = df.loc[:, only_floats].median()
+    numeric = df.columns[[x in [float, int] for x in df.dtypes.values]].values
+    strings = df.columns[[x not in [float, int] for x in df.dtypes.values]].values
+    df_avg = df.loc[:, numeric].median()
     # add non-numeric items to the dataframe
-    for k, v in df.iloc[0, ~only_floats].items():
+    for k, v in df.loc[0, strings].items():  # noqa
         df_avg[k] = v
 
+    df_avg.WCSAXES = int(df_avg.WCSAXES)
+    df_avg.NAXIS = int(df_avg.NAXIS)
     # make HDU with WCS keys and values
     wcs_hdu = fits.PrimaryHDU()
     for attr in df_avg.index:
@@ -73,7 +76,7 @@ def extract_all_WCS(file_list: list = []):
     """
     # read WCS for each frame
     wcss = []
-    for f in ff[:10]:
+    for f in file_list:
         hdu = fits.getheader(f)
         wcss.append(WCS(hdu))
 

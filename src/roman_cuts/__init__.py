@@ -24,6 +24,6 @@ def get_logger():
 
 log = get_logger()
 
-from cube import RomanCuts  # noqa
+from .cube import RomanCuts  # noqa
 
 __all__ = ["RomanCuts"]
