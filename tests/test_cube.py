@@ -3,8 +3,10 @@ Actual test won't be possible as copying image files to GitHub repo will use too
 memory.
 """
 
-from roman_cuts import RomanCuts
 import pytest
+
+from roman_cuts import RomanCuts
+
 
 def test_romancuts():
     """
@@ -12,5 +14,5 @@ def test_romancuts():
     """
     fl = []
     with pytest.raises(ValueError) as excinfo:
-        rcube = RomanCuts(field=3, sca=1, filter="F146", file_list=fl)
+        _ = RomanCuts(field=3, sca=1, filter="F146", file_list=fl)
     assert str(excinfo.value) == "Please provide a list of FFI files in `file_list`"
