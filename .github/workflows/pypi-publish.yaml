@@ -24,10 +24,9 @@ jobs:
           python -m pip install --upgrade pip
           poetry install --with dev
       
-      - name: Config Poetry to testPyPI
+      - name: Config Poetry to PyPI
         run: |
-          poetry config repositories.test-pypi https://test.pypi.org/legacy/
-          poetry config pypi-token.test-pypi "${{ secrets.TEST_PYPI_API_KEY }}"
+          poetry config pypi-token.pypi "${{ secrets.TEST_PYPI_API_KEY }}"
 
-      - name: Publish package to testPyPI
-        run: poetry publish -r test-pypi --build
+      - name: Publish package to PyPI
+        run: poetry publish --build
