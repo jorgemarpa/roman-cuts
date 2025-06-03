@@ -41,8 +41,8 @@ class RomanCuts:
         ----------
         field : int
             The field number.
-        scs : int
-            The scs number.
+        sca : int
+            The instrument Sensor Chip Assembly number.
         filter : str, optional
             The filter string (e.g., "F146"). Default is "F146".
         file_list : list, optional
