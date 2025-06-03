@@ -8,6 +8,7 @@
       members:
         - __init__
         - get_average_wcs
+        - get_all_wcs
         - make_cutout
         - save_cutout
       show_root_heading: true

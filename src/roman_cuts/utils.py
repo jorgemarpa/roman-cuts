@@ -17,16 +17,31 @@ WCS_ATTRS_STARTS = [
     "WCS",
     "PC",
     "RADE",
-    # "1P",
-    # "2P",
-    # "A_",
-    # "AP_",
-    # "B_",
-    # "BP_",
+    "1P",
+    "2P",
+    "A_",
+    "AP_",
+    "B_",
+    "BP_",
 ]
 
 
 def WCS_ATTRS(hdu, sip=True):
+    """
+    Extract WCS-related attribute keys from a FITS header.
+
+    Parameters
+    ----------
+    hdu : astropy.io.fits.Header
+        FITS header object from which to extract WCS attribute keys.
+    sip : bool, optional
+        If True, include SIP-related WCS keywords. Default is True.
+
+    Returns
+    -------
+    wcs_attrs : list of str
+        List of WCS attribute keys found in the header.
+    """
     wcs_attrs = np.hstack(
         [
             *[
@@ -38,21 +53,24 @@ def WCS_ATTRS(hdu, sip=True):
     return wcs_attrs
 
 
-def extract_average_WCS(file_list: list = []):
+def extract_average_WCS(file_list: list):
     """
-    Reads WCS keys and values from `file_list` FITS and computes an average WCS
+    Compute the average WCS from a list of FITS files.
+
+    Reads WCS keys and values from the provided FITS files and computes an average WCS.
+
+    Parameters
+    ----------
+    file_list : list of str
+        List of FITS file paths.
+
+    Returns
+    -------
+    wcs : astropy.wcs.WCS
+        WCS object constructed from the averaged WCS header values.
     """
     # read WCS keywords and values into a list of dictionaries for all times
-    frame_wcs = []
-    for f in file_list:
-        hdu = fits.getheader(f)
-        aux_wcs = {}
-        for attr in WCS_ATTRS(hdu):
-            aux_wcs[attr] = hdu[attr]
-        frame_wcs.append(aux_wcs)
-
-    # take the median value of every keyword with numeric values
-    df = pd.DataFrame(frame_wcs)
+    df = extract_all_WCS(file_list).reset_index(drop=False)
     numeric = df.columns[[x in [float, int] for x in df.dtypes.values]].values
     strings = df.columns[[x not in [float, int] for x in df.dtypes.values]].values
     df_avg = df.loc[:, numeric].median()
@@ -70,16 +88,45 @@ def extract_average_WCS(file_list: list = []):
     return WCS(wcs_hdu.header)
 
 
-def extract_all_WCS(file_list: list = []):
+def extract_all_WCS(file_list: list):
     """
-    Reads WCS keys and values from `file_list` FITS and return them as a list
+    Extract WCS keys and values from a list of FITS files.
+
+    Reads WCS keys and values from the provided FITS files and returns them as a DataFrame.
+
+    Parameters
+    ----------
+    file_list : list of str
+        List of FITS file paths.
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        DataFrame containing WCS keywords and values for each file, indexed by exposure number.
+
+    Raises
+    ------
+    ValueError
+        If the file list is empty.
     """
-    # read WCS for each frame
-    wcss = []
+    if len(file_list) == 0:
+        raise ValueError("File list is empty. Cannot extract WCS.")
+    frame_wcs = []
+    frame_no = []
     for f in file_list:
         hdu = fits.getheader(f)
-        wcss.append(WCS(hdu))
+        aux_wcs = {}
+        for attr in WCS_ATTRS(hdu):
+            aux_wcs[attr] = hdu[attr]
+        frame_wcs.append(aux_wcs)
+        if "EXP_NO" in hdu.keys():
+            exp_no = hdu["EXP_NO"]
+        else:
+            exp_no = int(
+                f.split("_")[-2]
+            )  # assuming the file name contains the exposure number
+        frame_no.append(exp_no)
 
-    # return a list of WCS object
-    return wcss
-
+    # take the median value of every keyword with numeric values
+    df = pd.DataFrame(frame_wcs, index=frame_no)
+    return df
