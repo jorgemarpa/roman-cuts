@@ -110,6 +110,27 @@ class RomanCuts:
             self.wcs = WCS(loaded_dict, relax=True)
         return
 
+    def get_all_wcs(self):
+        """
+        Extracts WCS information from all FFI files.
+        """
+        # check if wcs is in disk
+        dir = f"{PACKAGEDIR}/data/wcs/"
+        filename = f"{dir}Roman_WFI_wcss_field{self.field:03}_sca{self.sca:02}_{self.filter}.json.bz2"
+        if not os.path.isfile(filename):
+            # if not compute a new one and save it to disk
+            wcss_df = extract_all_WCS(self.file_list)
+            wcss_df.to_json(filename, orient="index", compression="bz2")
+        else:
+            # if exist, load from disk
+            wcss_df = pd.read_json(filename, oreint="index", compression="bz2")
+        # convert to list of WCS objects
+        self.wcss = [
+            WCS(wcs_dict, relax=True)
+            for wcs_dict in wcss_df.to_dict(orient="index").values()
+        ]
+        return
+
     def make_cutout(
         self,
         radec: Tuple = (None, None),
@@ -168,7 +189,7 @@ class RomanCuts:
         self._get_metadata()
         if load_all_wcss:
             log.info("Getting WCSs per frame")
-            self._get_all_wcs()
+            self.get_all_wcs()
         return
 
     def _get_cutout_cube(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
@@ -247,12 +268,6 @@ class RomanCuts:
         }
 
         return
-
-    def _get_all_wcs(self):
-        """
-        Extracts WCS information from all FFI files.
-        """
-        self.wcss = extract_all_WCS(self.file_list)
 
     def save_cutout(self, output: Optional[str] = None, format: str = "asdf"):
         """
