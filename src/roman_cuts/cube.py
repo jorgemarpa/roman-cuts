@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 import asdf
 import numpy as np
+import pandas as pd
 from astropy.io import fits
 from astropy.wcs import WCS
 from tqdm import tqdm
@@ -123,7 +124,7 @@ class RomanCuts:
             wcss_df.to_json(filename, orient="index", compression="bz2")
         else:
             # if exist, load from disk
-            wcss_df = pd.read_json(filename, oreint="index", compression="bz2")
+            wcss_df = pd.read_json(filename, orient="index", compression="bz2")
         # convert to list of WCS objects
         self.wcss = [
             WCS(wcs_dict, relax=True)
@@ -136,7 +137,7 @@ class RomanCuts:
         radec: Tuple = (None, None),
         rowcol: Tuple[int, int] = (0, 0),
         size: Tuple[int, int] = (15, 15),
-        load_all_wcss: bool = False,
+        dithered: bool = False,
     ):
         """
         Creates a cutout from the data.
@@ -155,46 +156,61 @@ class RomanCuts:
         # check we have the wcs loaded
         if not hasattr(self, "wcs"):
             self.get_average_wcs()
+        if not hasattr(self, "wcss"):
+            self.get_all_wcs()
+        self.dithered = dithered
         # use radec if given
         if (
             radec != (None, None)
             and isinstance(radec[0], float)
             and isinstance(radec[1], float)
         ):
-            log.info("Using Ra, Dec coordinates and average WCS to center the cutout")
             self.ra = radec[0]
             self.dec = radec[1]
-            row, col = self.wcs.all_world2pix(self.ra, self.dec, 0)
-            row = int(np.round(row))
-            col = int(np.round(col))
+            if dithered:
+                log.info(
+                    "Using Ra, Dec coordinates and WCS per frame to center the cutout"
+                )
+                # use the each WCS to get the row col
+                row, col = np.vstack(
+                    [x.all_world2pix(self.ra, self.dec, 0) for x in self.wcss]
+                ).T
+                row = np.round(row).astype(int)
+                col = np.round(col).astype(int)
+                self.target_pixel = np.array([row, col]).T
+            else:
+                log.info(
+                    "Using Ra, Dec coordinates and average WCS to center the cutout"
+                )
+                row, col = self.wcs.all_world2pix(self.ra, self.dec, 0)
+                row = np.array([int(np.round(row))])
+                col = np.array([int(np.round(col))])
+                self.target_pixel = np.array([row, col])
         # if not use the rowcol
         elif isinstance(rowcol[0], int) and isinstance(rowcol[1], int):
             row, col = rowcol[0], rowcol[1]
+            self.ra, self.dec = self.wcs.all_pix2world(row, col, 0)
         # raise error if values are not valid
         else:
             raise ValueError("Please provide valid `radec` or `rowcol` values")
 
-        origin = (int(row - size[0] / 2), int(col - size[1] / 2))
-
         log.info("Getting 3d data...")
-        self._get_cutout_cube(size=size, origin=origin)
-
-        print()
-        if not hasattr(self, "ra"):
-            self.ra, self.dec = self.wcs.all_pix2world(row, col, 0)
+        if dithered:
+            self._get_cutout_cube_dithered(center=np.vstack([row, col]).T, size=size)
+        else:
+            origin = (int(row - size[0] / 2), int(col - size[1] / 2))
+            self._get_cutout_cube_static(size=size, origin=origin)
 
         log.info("Getting 1d arrays data...")
         self._get_arrays()
         log.info("Getting metadata")
         self._get_metadata()
-        if load_all_wcss:
-            log.info("Getting WCSs per frame")
-            self.get_all_wcs()
         return
 
-    def _get_cutout_cube(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
+    def _get_cutout_cube_static(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
         """
-        Extracts a cutout cube from the FFI files.
+        Extracts a static cutout cube from the FFI files. It does not account for 
+        dithered observations, therefore the cutout is fixed to the pixel grid.
 
         Parameters
         ----------
@@ -210,6 +226,7 @@ class RomanCuts:
         if (rmin > RMAX) | (cmin > CMAX):
             raise ValueError("`cutout_origin` must be within the image.")
 
+        # set ending pixels 
         rmax = rmin + size[0]
         cmax = cmin + size[1]
 
@@ -230,41 +247,100 @@ class RomanCuts:
         self.row = np.arange(rmin, rmax)
         self.column = np.arange(cmin, cmax)
         return
+    
+    def _get_cutout_cube_dithered(self, center: np.ndarray, size: Tuple = (15, 15)):
+        """
+        Extracts a static cutout cube from the FFI files. The cutout is centered on
+        the pixel coordinates equivalent to the celestial coordinates, therefore
+        it accounts for dithered observations.
+
+        Parameters
+        ----------
+        center : ndarray
+            2D array of shape (nt, 2) with pixel coordinates of the center (row, col).
+            If the shape is (1, 2), the same center is used for all frames.
+        size : tuple of ints, optional
+            Size of the cutout in pixels (rows, columns). Default is (15, 15).
+        """
+        # set starting pixel
+        if len(center.shape) != 2:
+            raise ValueError("`center` must be a 2D array with shape (nt, 2)")
+        if center.shape[0] != len(self.file_list) and not center.shape[0] == 1:
+            raise ValueError(
+                "The number of rows in `center` must match the number of files in `file_list`"
+            )
+        if center.shape[0] == 1:
+            log.info(
+                "Using the same center for all frames, dithering not accounted."
+            )
+            center = np.tile(center, (len(self.file_list), 1))
+
+        row0 = center[:, 0] - int(size[0] / 2)
+        col0 = center[:, 1] - int(size[1] / 2)
+        rmin = RMIN + row0
+        cmin = CMIN + col0
+        rmax = rmin + size[0]
+        cmax = cmin + size[1]
+
+        if (rmin > RMAX).any() | (cmin > CMAX).any() | (rmax > RMAX).any() | (cmax > CMAX).any():
+            raise ValueError(
+                "Cutout out of CCD limits. This is due to the dithered observations"
+                " and the size of the cutout. Please reduce the size or change the center."
+                )
+
+        flux = []
+        flux_err = []
+        for i, f in tqdm(enumerate(self.file_list), total=len(self.file_list)):
+            with fits.open(f, lazy_load_hdus=True) as aux:
+                flux.append(aux[0].data[rmin[i]:rmax[i], cmin[i]:cmax[i]])
+                flux_err.append(aux[1].data[rmin[i]:rmax[i], cmin[i]:cmax[i]])
+
+        self.flux = np.array(flux)
+        self.flux_err = np.array(flux_err)
+        self.row = np.vstack([np.arange(rn, rx) for rn, rx in zip(rmin, rmax)])
+        self.column = np.vstack([np.arange(cn, cx) for cn, cx in zip(cmin, cmax)])
+        return
 
     def _get_arrays(self):
         """
-        Extracts time, cadenceno, and quality arrays from the FFI files.
+        Extracts time, exposureno, and quality arrays from the FFI files.
         """
-        time, cadenceno, quality = [], [], []
+        time, exposureno, quality = [], [], []
         for k, f in enumerate(self.file_list):
             hdu = fits.getheader(f)
             time.append((hdu["TSTART"] + hdu["TEND"]) / 2.0)
             # replace these two to corresponding keywords in future simulations
-            cadenceno.append(k)
+            exposureno.append(int(f.split("_")[-2]))
             quality.append(0)
         self.time = np.array(time)
-        self.cadenceno = np.array(cadenceno)
+        self.exposureno = np.array(exposureno)
         self.quality = np.array(quality)
 
     def _get_metadata(self):
         """
         Extracts metadata from the first FFI file.
         """
-        hdu = fits.getheader(self.file_list[0])
+        hdus = fits.getheader(self.file_list[0])
+        hduf = fits.getheader(self.file_list[-1])
         self.metadata = {
             "MISSION": "Roman",
             "TELESCOP": "Roman",
-            "CREATOR": "TRExS",
-            "SOFTWARE": hdu["SOFTWARE"],
-            "RADESYS": hdu["RADESYS"],
-            "EQUINOX": hdu["EQUINOX"],
-            "FILTER": hdu["FILTER"],
+            "CREATOR": "TRExS-roman-cuts",
+            "SOFTWARE": hdus["SOFTWARE"],
+            "RADESYS": hdus["RADESYS"],
+            "EQUINOX": hdus["EQUINOX"],
+            "FILTER": hdus["FILTER"],
             "FIELD": int(self.file_list[0].split("_")[-5][-2:]),
-            "DETECTOR": hdu["DETECTOR"],
-            "EXPOSURE": hdu["EXPOSURE"],
+            "DETECTOR": hdus["DETECTOR"],
+            "EXPOSURE": hdus["EXPOSURE"],
             "READMODE": self.file_list[0].split("_")[-4],
+            "TSTART": hdus["TSTART"],
+            "TEND": hduf["TEND"],
             "RA_CEN": float(self.ra),
             "DEC_CEN": float(self.dec),
+            "DITHERED": self.dithered,
+            "NTIMES": self.nt,
+            "IMGSIZE": self.flux.shape[1:],
         }
 
         return
@@ -283,7 +359,7 @@ class RomanCuts:
 
         if output is None:
             cutout_str = (
-                f"{self.ra:.4f}_{self.dec:.4f}_s{len(self.row)}x{len(self.column)}"
+                f"{self.ra:.4f}_{self.dec:.4f}_s{self.flux.shape[1]}x{self.flux.shape[2]}"
             )
             output = f"./roman_cutout_field{self.metadata['FIELD']:02}_{self.metadata['DETECTOR']:02}_{cutout_str}.{format}"
             log.info(f"Saving data to {output}")
@@ -292,7 +368,13 @@ class RomanCuts:
             raise ValueError(
                 "Use a valid and matching extension in `output` and `format`"
             )
-
+        if self.dithered:
+            save_row = self.row[:, 0]
+            save_col = self.column[:, 0]
+        else:
+            save_row = self.row[0]
+            save_col = self.column[0]
+    
         if format in ["asdf", "ASDF"]:
             wcs = self.wcss if hasattr(self, "wcss") else self.wcs
             tree = {
@@ -303,10 +385,10 @@ class RomanCuts:
                         "flux": self.flux,
                         "flux_err": self.flux_err,
                         "time": self.time,
-                        "cadenceno": self.cadenceno,
+                        "exposureno": self.exposureno,
                         "quality": self.quality,
-                        "row": self.row,
-                        "column": self.column,
+                        "row": save_row,
+                        "column": save_col,
                     },
                 }
             }
