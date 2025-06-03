@@ -209,7 +209,7 @@ class RomanCuts:
 
     def _get_cutout_cube_static(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
         """
-        Extracts a static cutout cube from the FFI files. It does not account for 
+        Extracts a static cutout cube from the FFI files. It does not account for
         dithered observations, therefore the cutout is fixed to the pixel grid.
 
         Parameters
@@ -226,7 +226,7 @@ class RomanCuts:
         if (rmin > RMAX) | (cmin > CMAX):
             raise ValueError("`cutout_origin` must be within the image.")
 
-        # set ending pixels 
+        # set ending pixels
         rmax = rmin + size[0]
         cmax = cmin + size[1]
 
@@ -247,7 +247,7 @@ class RomanCuts:
         self.row = np.arange(rmin, rmax)
         self.column = np.arange(cmin, cmax)
         return
-    
+
     def _get_cutout_cube_dithered(self, center: np.ndarray, size: Tuple = (15, 15)):
         """
         Extracts a static cutout cube from the FFI files. The cutout is centered on
@@ -270,9 +270,7 @@ class RomanCuts:
                 "The number of rows in `center` must match the number of files in `file_list`"
             )
         if center.shape[0] == 1:
-            log.info(
-                "Using the same center for all frames, dithering not accounted."
-            )
+            log.info("Using the same center for all frames, dithering not accounted.")
             center = np.tile(center, (len(self.file_list), 1))
 
         row0 = center[:, 0] - int(size[0] / 2)
@@ -282,18 +280,23 @@ class RomanCuts:
         rmax = rmin + size[0]
         cmax = cmin + size[1]
 
-        if (rmin > RMAX).any() | (cmin > CMAX).any() | (rmax > RMAX).any() | (cmax > CMAX).any():
+        if (
+            (rmin > RMAX).any()
+            | (cmin > CMAX).any()
+            | (rmax > RMAX).any()
+            | (cmax > CMAX).any()
+        ):
             raise ValueError(
                 "Cutout out of CCD limits. This is due to the dithered observations"
                 " and the size of the cutout. Please reduce the size or change the center."
-                )
+            )
 
         flux = []
         flux_err = []
         for i, f in tqdm(enumerate(self.file_list), total=len(self.file_list)):
             with fits.open(f, lazy_load_hdus=True) as aux:
-                flux.append(aux[0].data[rmin[i]:rmax[i], cmin[i]:cmax[i]])
-                flux_err.append(aux[1].data[rmin[i]:rmax[i], cmin[i]:cmax[i]])
+                flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+                flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
@@ -358,9 +361,7 @@ class RomanCuts:
         """
 
         if output is None:
-            cutout_str = (
-                f"{self.ra:.4f}_{self.dec:.4f}_s{self.flux.shape[1]}x{self.flux.shape[2]}"
-            )
+            cutout_str = f"{self.ra:.4f}_{self.dec:.4f}_s{self.flux.shape[1]}x{self.flux.shape[2]}"
             output = f"./roman_cutout_field{self.metadata['FIELD']:02}_{self.metadata['DETECTOR']:02}_{cutout_str}.{format}"
             log.info(f"Saving data to {output}")
 
@@ -374,7 +375,7 @@ class RomanCuts:
         else:
             save_row = self.row[0]
             save_col = self.column[0]
-    
+
         if format in ["asdf", "ASDF"]:
             wcs = self.wcss if hasattr(self, "wcss") else self.wcs
             tree = {

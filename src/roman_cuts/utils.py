@@ -122,10 +122,11 @@ def extract_all_WCS(file_list: list):
         if "EXP_NO" in hdu.keys():
             exp_no = hdu["EXP_NO"]
         else:
-            exp_no = int(f.split("_")[-2]) # assuming the file name contains the exposure number
+            exp_no = int(
+                f.split("_")[-2]
+            )  # assuming the file name contains the exposure number
         frame_no.append(exp_no)
 
     # take the median value of every keyword with numeric values
     df = pd.DataFrame(frame_wcs, index=frame_no)
     return df
-

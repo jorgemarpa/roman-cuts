@@ -22,6 +22,7 @@ def get_logger():
     logger.addHandler(logging.StreamHandler())
     return logger
 
+
 log = get_logger()
 
 from .cube import RomanCuts  # noqa

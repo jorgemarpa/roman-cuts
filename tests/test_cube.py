@@ -1,5 +1,5 @@
 """
-Actual test won't be possible as copying image files to GitHub repo will use too much 
+Actual test won't be possible as copying image files to GitHub repo will use too much
 memory.
 """
 
