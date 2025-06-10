@@ -2,7 +2,7 @@ import bz2
 import functools
 import json
 import os
-from typing import Optional, Tuple, Any
+from typing import Any, Optional, Tuple
 
 import asdf
 import numpy as np
@@ -259,9 +259,7 @@ class RomanCuts:
         return
 
     @functools.lru_cache(maxsize=6)
-    def _get_cutout_cube_dithered(
-        self, center: Any, size: Tuple[int, int] = (15, 15)
-    ):
+    def _get_cutout_cube_dithered(self, center: Any, size: Tuple[int, int] = (15, 15)):
         """
         Extracts a static cutout cube from the FFI files. The cutout is centered on
         the pixel coordinates equivalent to the celestial coordinates, therefore
