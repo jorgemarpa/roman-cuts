@@ -1,4 +1,5 @@
 import bz2
+import functools
 import json
 import os
 from typing import Optional, Tuple
@@ -206,11 +207,12 @@ class RomanCuts:
         else:
             origin = (int(row - size[0] / 2), int(col - size[1] / 2))
             self._get_cutout_cube_static(size=size, origin=origin)
-        
+
         self._get_metadata()
 
         return
 
+    @functools.lru_cache(maxsize=6)
     def _get_cutout_cube_static(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
         """
         Extracts a static cutout cube from the FFI files. It does not account for
@@ -252,6 +254,7 @@ class RomanCuts:
         self.column = np.arange(cmin, cmax)
         return
 
+    @functools.lru_cache(maxsize=6)
     def _get_cutout_cube_dithered(self, center: np.ndarray, size: Tuple = (15, 15)):
         """
         Extracts a static cutout cube from the FFI files. The cutout is centered on
