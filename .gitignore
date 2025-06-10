@@ -7,4 +7,3 @@ dist
 poetry.lock
 .mypy_cache
 notebooks
-src/roman_cuts/data/

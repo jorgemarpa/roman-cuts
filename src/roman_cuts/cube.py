@@ -62,6 +62,11 @@ class RomanCuts:
 
         self._check_file_list()
 
+        log.info("Getting 1d arrays data...")
+        self._get_arrays()
+        log.info("Getting metadata")
+        self._get_metadata()
+
     def __repr__(self):
         return f"Roman WFI Field {self.field} SCA {self.sca} Filter {self.filter} Frames {self.nt}"
 
@@ -128,7 +133,8 @@ class RomanCuts:
         # convert to list of WCS objects
         self.wcss = [
             WCS(wcs_dict, relax=True)
-            for wcs_dict in wcss_df.to_dict(orient="index").values()
+            for key, wcs_dict in wcss_df.to_dict(orient="index").items()
+            if key in self.exposureno
         ]
         return
 
@@ -200,11 +206,9 @@ class RomanCuts:
         else:
             origin = (int(row - size[0] / 2), int(col - size[1] / 2))
             self._get_cutout_cube_static(size=size, origin=origin)
-
-        log.info("Getting 1d arrays data...")
-        self._get_arrays()
-        log.info("Getting metadata")
+        
         self._get_metadata()
+
         return
 
     def _get_cutout_cube_static(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
@@ -326,7 +330,7 @@ class RomanCuts:
         hdus = fits.getheader(self.file_list[0])
         hduf = fits.getheader(self.file_list[-1])
         self.metadata = {
-            "MISSION": "Roman",
+            "MISSION": "Roman-Sim",
             "TELESCOP": "Roman",
             "CREATOR": "TRExS-roman-cuts",
             "SOFTWARE": hdus["SOFTWARE"],
@@ -339,11 +343,11 @@ class RomanCuts:
             "READMODE": self.file_list[0].split("_")[-4],
             "TSTART": hdus["TSTART"],
             "TEND": hduf["TEND"],
-            "RA_CEN": float(self.ra),
-            "DEC_CEN": float(self.dec),
-            "DITHERED": self.dithered,
+            "RA_CEN": float(self.ra) if hasattr(self, "ra") else None,
+            "DEC_CEN": float(self.dec) if hasattr(self, "dec") else None,
+            "DITHERED": self.dithered if hasattr(self, "dithered") else None,
             "NTIMES": self.nt,
-            "IMGSIZE": self.flux.shape[1:],
+            "IMGSIZE": self.flux.shape[1:] if hasattr(self, "flux") else None,
         }
 
         return
