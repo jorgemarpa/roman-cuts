@@ -1,7 +1,8 @@
 import bz2
+import functools
 import json
 import os
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import asdf
 import numpy as np
@@ -202,16 +203,20 @@ class RomanCuts:
 
         log.info("Getting 3d data...")
         if dithered:
-            self._get_cutout_cube_dithered(center=np.vstack([row, col]).T, size=size)
+            center = tuple([(a, b) for a, b in np.vstack([row, col]).T])
+            self._get_cutout_cube_dithered(center=center, size=size)
         else:
             origin = (int(row - size[0] / 2), int(col - size[1] / 2))
             self._get_cutout_cube_static(size=size, origin=origin)
-        
+
         self._get_metadata()
 
         return
 
-    def _get_cutout_cube_static(self, size: Tuple = (15, 15), origin: Tuple = (0, 0)):
+    @functools.lru_cache(maxsize=6)
+    def _get_cutout_cube_static(
+        self, size: Tuple[int, int] = (15, 15), origin: Tuple[int, int] = (0, 0)
+    ):
         """
         Extracts a static cutout cube from the FFI files. It does not account for
         dithered observations, therefore the cutout is fixed to the pixel grid.
@@ -242,9 +247,10 @@ class RomanCuts:
         flux = []
         flux_err = []
         for f in tqdm(self.file_list):
-            with fits.open(f, lazy_load_hdus=True) as aux:
-                flux.append(aux[0].data[rmin:rmax, cmin:cmax])
-                flux_err.append(aux[1].data[rmin:rmax, cmin:cmax])
+            aux = fits.open(f)
+            flux.append(aux[0].data[rmin:rmax, cmin:cmax])
+            flux_err.append(aux[1].data[rmin:rmax, cmin:cmax])
+            aux.close()
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
@@ -252,7 +258,8 @@ class RomanCuts:
         self.column = np.arange(cmin, cmax)
         return
 
-    def _get_cutout_cube_dithered(self, center: np.ndarray, size: Tuple = (15, 15)):
+    @functools.lru_cache(maxsize=6)
+    def _get_cutout_cube_dithered(self, center: Any, size: Tuple[int, int] = (15, 15)):
         """
         Extracts a static cutout cube from the FFI files. The cutout is centered on
         the pixel coordinates equivalent to the celestial coordinates, therefore
@@ -266,9 +273,11 @@ class RomanCuts:
         size : tuple of ints, optional
             Size of the cutout in pixels (rows, columns). Default is (15, 15).
         """
+        if not isinstance(center, (np.ndarray)):
+            center = np.array(center)
         # set starting pixel
         if len(center.shape) != 2:
-            raise ValueError("`center` must be a 2D array with shape (nt, 2)")
+            raise ValueError("`center` must be a 2D array with shape (nt, 2) or (1, 2)")
         if center.shape[0] != len(self.file_list) and not center.shape[0] == 1:
             raise ValueError(
                 "The number of rows in `center` must match the number of files in `file_list`"
@@ -298,9 +307,10 @@ class RomanCuts:
         flux = []
         flux_err = []
         for i, f in tqdm(enumerate(self.file_list), total=len(self.file_list)):
-            with fits.open(f, lazy_load_hdus=True) as aux:
-                flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
-                flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+            aux = fits.open(f)
+            flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+            flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+            aux.close()
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
