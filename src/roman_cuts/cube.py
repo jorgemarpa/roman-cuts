@@ -33,7 +33,12 @@ class RomanCuts:
     """
 
     def __init__(
-        self, field: int, sca: int, filter: str = "F146", file_list: list = []
+        self,
+        field: int,
+        sca: int,
+        filter: str = "F146",
+        file_list: list = [],
+        file_format: str = "fits",
     ):
         """
         Initializes the class with field, scs, filter, and file_list.
@@ -53,6 +58,7 @@ class RomanCuts:
         self.field = field
         self.sca = sca
         self.filter = filter
+        self.file_format_in = file_format
 
         if len(file_list) == 0:
             raise ValueError("Please provide a list of FFI files in `file_list`")
@@ -61,7 +67,7 @@ class RomanCuts:
         self.file_list = file_list
         self.nt = len(file_list)
 
-        self._check_file_list()
+        self._check_input_files()
 
         log.info("Getting 1d arrays data...")
         self._get_arrays()
@@ -70,6 +76,28 @@ class RomanCuts:
 
     def __repr__(self):
         return f"Roman WFI Field {self.field} SCA {self.sca} Filter {self.filter} Frames {self.nt}"
+
+    def _check_input_files(self):
+        if self.file_format_in in ["asdf", "ASDF"]:
+            if len(self.file_list) == 1:
+                # single ASDF file, this is a data cube
+                self._check_file_list()
+            else:
+                # currently not supporting list of ASDF files
+                raise NotImplementedError
+                # list of ASDF files, each is a frame
+        elif self.file_format_in in ["fits", "FITS"]:
+            if len(self.file_list) == 1:
+                # currently not supporting data cubes in FITS
+                raise NotImplementedError
+            else:
+                self._check_file_list()
+            # list of ASDF files, each is a frame
+        else:
+            raise ValueError(
+                f"File format {self.file_format_in} not supported. "
+                "Please use 'fits' or 'asdf'."
+            )
 
     def _check_file_list(self):
         """
@@ -84,10 +112,17 @@ class RomanCuts:
         field, sca, filter = [], [], []
         # check all files are same Field/SCA/Filter
         for f in self.file_list:
-            hdr = fits.getheader(f)
-            # field.append(hdr["FIELD"])
-            sca.append(hdr["DETECTOR"])
-            filter.append(hdr["FILTER"])
+            if self.file_format_in == "fits":
+                hdr = fits.getheader(f)
+                # field.append(hdr["FIELD"])
+                sca.append(hdr["DETECTOR"])
+                filter.append(hdr["FILTER"])
+            if self.file_format_in == "asdf":
+                datamodel = asdf.open(f)
+                sca.append(datamodel["roman"]["meta"]["DETECTOR"])
+                field.append(datamodel["roman"]["meta"]["FIELD"])
+                filter.append(datamodel["roman"]["meta"]["FILTER"])
+                datamodel.close()
 
         if len(set(field)) > 1:
             raise ValueError("File list contains more than one field")
@@ -204,6 +239,7 @@ class RomanCuts:
         log.info("Getting 3d data...")
         if dithered:
             center = tuple([(a, b) for a, b in np.vstack([row, col]).T])
+            log.info(len(center))
             self._get_cutout_cube_dithered(center=center, size=size)
         else:
             origin = (int(row - size[0] / 2), int(col - size[1] / 2))
@@ -246,7 +282,7 @@ class RomanCuts:
 
         flux = []
         flux_err = []
-        for f in tqdm(self.file_list):
+        for f in tqdm(self.file_list, desc="Extracting cutout"):
             aux = fits.open(f)
             flux.append(aux[0].data[rmin:rmax, cmin:cmax])
             flux_err.append(aux[1].data[rmin:rmax, cmin:cmax])
@@ -306,7 +342,11 @@ class RomanCuts:
 
         flux = []
         flux_err = []
-        for i, f in tqdm(enumerate(self.file_list), total=len(self.file_list)):
+        for i, f in tqdm(
+            enumerate(self.file_list),
+            total=len(self.file_list),
+            desc="Extracting cutout",
+        ):
             aux = fits.open(f)
             flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
             flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
