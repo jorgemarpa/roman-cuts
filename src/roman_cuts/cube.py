@@ -239,7 +239,6 @@ class RomanCuts:
         log.info("Getting 3d data...")
         if dithered:
             center = tuple([(a, b) for a, b in np.vstack([row, col]).T])
-            log.info(len(center))
             self._get_cutout_cube_dithered(center=center, size=size)
         else:
             origin = (int(row - size[0] / 2), int(col - size[1] / 2))
