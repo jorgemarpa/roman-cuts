@@ -77,7 +77,6 @@ class RomanCuts:
             self.image_size = self.metadata["IMGSIZE"]
         else:
             self.image_size = [RMAX, CMAX]
-        
 
     def __repr__(self):
         return f"Roman WFI Field {self.field} SCA {self.sca} Filter {self.filter} Frames {self.nt}"
@@ -233,7 +232,7 @@ class RomanCuts:
                 self.target_pixel = np.array([row, col])
                 row = np.array([int(np.round(row))])
                 col = np.array([int(np.round(col))])
-                
+
         # if not use the rowcol
         elif isinstance(rowcol[0], int) and isinstance(rowcol[1], int):
             row, col = rowcol[0], rowcol[1]
@@ -310,9 +309,9 @@ class RomanCuts:
             flux = cont["roman"]["data"]["flux"][:][:, row_range[row_range >= 0]][
                 :, :, col_range[col_range >= 0]
             ]
-            flux_err = cont["roman"]["data"]["flux_err"][:][:, row_range[row_range >= 0]][
-                :, :, col_range[col_range >= 0]
-            ]
+            flux_err = cont["roman"]["data"]["flux_err"][:][
+                :, row_range[row_range >= 0]
+            ][:, :, col_range[col_range >= 0]]
         else:
             raise ValueError("File format not supported")
 
@@ -401,7 +400,7 @@ class RomanCuts:
             cmax -= self.column_min_data
             flux = []
             flux_err = []
-            
+
             cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
             for i in range(self.nt):
                 # find which requested row/column are in data range
@@ -425,7 +424,6 @@ class RomanCuts:
                 flux_err.append(aux)
         else:
             raise ValueError("File format not supported")
-
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
@@ -452,11 +450,14 @@ class RomanCuts:
             self.quality = cont["roman"]["data"]["quality"].copy()
             self.row_min_data = cont["roman"]["data"]["row"]
             self.column_min_data = cont["roman"]["data"]["column"]
-            self.row_max_data = cont["roman"]["data"]["row"] + cont["roman"]["meta"]["IMGSIZE"][0]
-            self.column_max_data = cont["roman"]["data"]["column"] + cont["roman"]["meta"]["IMGSIZE"][1]
+            self.row_max_data = (
+                cont["roman"]["data"]["row"] + cont["roman"]["meta"]["IMGSIZE"][0]
+            )
+            self.column_max_data = (
+                cont["roman"]["data"]["column"] + cont["roman"]["meta"]["IMGSIZE"][1]
+            )
         return
 
-    
     def _fits_arrays(self):
         """
         Extracts time, exposureno, and quality arrays from the FFI files.
@@ -477,14 +478,12 @@ class RomanCuts:
         self.column_max_data = CMAX
         return
 
-
     def _get_metadata(self):
         if self.file_format_in == "fits":
             self._fits_metadata()
         elif self.file_format_in == "asdf":
             self._asdf_metadata()
         return
-
 
     def _asdf_metadata(self):
         """
@@ -493,7 +492,6 @@ class RomanCuts:
         with asdf.open(self.file_list[0], lazy_tree=False, lazy_load=True) as cont:
             self.metadata = cont["roman"]["meta"].copy()
         return
-
 
     def _fits_metadata(self):
         """
