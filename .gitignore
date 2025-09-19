@@ -7,3 +7,4 @@ dist
 poetry.lock
 .mypy_cache
 notebooks
+*.DS_Store
