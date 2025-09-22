@@ -33,7 +33,12 @@ class RomanCuts:
     """
 
     def __init__(
-        self, field: int, sca: int, filter: str = "F146", file_list: list = []
+        self,
+        field: int,
+        sca: int,
+        filter: str = "F146",
+        file_list: list = [],
+        file_format: str = "fits",
     ):
         """
         Initializes the class with field, scs, filter, and file_list.
@@ -53,23 +58,50 @@ class RomanCuts:
         self.field = field
         self.sca = sca
         self.filter = filter
+        self.file_format_in = file_format
 
         if len(file_list) == 0:
             raise ValueError("Please provide a list of FFI files in `file_list`")
         if not isinstance(file_list, (list, np.ndarray)):
             file_list = np.sort([file_list])
         self.file_list = file_list
-        self.nt = len(file_list)
 
-        self._check_file_list()
+        self._check_input_files()
 
         log.info("Getting 1d arrays data...")
         self._get_arrays()
         log.info("Getting metadata")
         self._get_metadata()
+        self.nt = self.metadata["NTIMES"]
+        if self.file_format_in == "asdf":
+            self.image_size = self.metadata["IMGSIZE"]
+        else:
+            self.image_size = [RMAX, CMAX]
 
     def __repr__(self):
         return f"Roman WFI Field {self.field} SCA {self.sca} Filter {self.filter} Frames {self.nt}"
+
+    def _check_input_files(self):
+        if self.file_format_in in ["asdf", "ASDF"]:
+            if len(self.file_list) == 1:
+                # single ASDF file, this is a data cube
+                self._check_file_list()
+            else:
+                # currently not supporting list of ASDF files
+                raise NotImplementedError
+                # list of ASDF files, each is a frame
+        elif self.file_format_in in ["fits", "FITS"]:
+            if len(self.file_list) == 1:
+                # currently not supporting data cubes in FITS
+                raise NotImplementedError
+            else:
+                self._check_file_list()
+            # list of ASDF files, each is a frame
+        else:
+            raise ValueError(
+                f"File format {self.file_format_in} not supported. "
+                "Please use 'fits' or 'asdf'."
+            )
 
     def _check_file_list(self):
         """
@@ -84,10 +116,17 @@ class RomanCuts:
         field, sca, filter = [], [], []
         # check all files are same Field/SCA/Filter
         for f in self.file_list:
-            hdr = fits.getheader(f)
-            # field.append(hdr["FIELD"])
-            sca.append(hdr["DETECTOR"])
-            filter.append(hdr["FILTER"])
+            if self.file_format_in == "fits":
+                hdr = fits.getheader(f)
+                # field.append(hdr["FIELD"])
+                sca.append(hdr["DETECTOR"])
+                filter.append(hdr["FILTER"])
+            if self.file_format_in == "asdf":
+                datamodel = asdf.open(f, lazy_tree=True, lazy_load=True)
+                sca.append(datamodel["roman"]["meta"]["DETECTOR"])
+                field.append(datamodel["roman"]["meta"]["FIELD"])
+                filter.append(datamodel["roman"]["meta"]["FILTER"])
+                datamodel.close()
 
         if len(set(field)) > 1:
             raise ValueError("File list contains more than one field")
@@ -182,17 +221,18 @@ class RomanCuts:
                 row, col = np.vstack(
                     [x.all_world2pix(self.ra, self.dec, 0) for x in self.wcss]
                 ).T
+                self.target_pixel = np.array([row, col]).T
                 row = np.round(row).astype(int)
                 col = np.round(col).astype(int)
-                self.target_pixel = np.array([row, col]).T
             else:
                 log.info(
                     "Using Ra, Dec coordinates and average WCS to center the cutout"
                 )
                 row, col = self.wcs.all_world2pix(self.ra, self.dec, 0)
+                self.target_pixel = np.array([row, col])
                 row = np.array([int(np.round(row))])
                 col = np.array([int(np.round(col))])
-                self.target_pixel = np.array([row, col])
+
         # if not use the rowcol
         elif isinstance(rowcol[0], int) and isinstance(rowcol[1], int):
             row, col = rowcol[0], rowcol[1]
@@ -231,31 +271,64 @@ class RomanCuts:
         # set starting pixel
         rmin = RMIN + origin[0]
         cmin = CMIN + origin[1]
-
-        if (rmin > RMAX) | (cmin > CMAX):
-            raise ValueError("`cutout_origin` must be within the image.")
-
         # set ending pixels
         rmax = rmin + size[0]
         cmax = cmin + size[1]
 
-        if (rmax > RMAX) | (cmax > CMAX):
-            log.warning("Cutout exceeds image limits, reducing size.")
-            rmax = np.min([rmax, RMAX])
-            cmax = np.min([cmax, CMAX])
+        # make sure requested data is in cutout
+        if (
+            (rmin < self.row_min_data)
+            | (cmin < self.column_min_data)
+            | (rmin > self.row_max_data)
+            | (cmin > self.column_max_data)
+        ):
+            raise ValueError("`cutout_origin` must be within the image.")
 
-        flux = []
-        flux_err = []
-        for f in tqdm(self.file_list):
-            aux = fits.open(f)
-            flux.append(aux[0].data[rmin:rmax, cmin:cmax])
-            flux_err.append(aux[1].data[rmin:rmax, cmin:cmax])
-            aux.close()
+        if (rmax > self.row_max_data) | (cmax > self.column_max_data):
+            raise ValueError("Cutout exceeds image limits, reducing size.")
+
+        # get data from FITS assuming is the FFI
+        if self.file_format_in == "fits":
+            flux = []
+            flux_err = []
+            for f in tqdm(self.file_list, desc="Extracting cutout"):
+                aux = fits.open(f)
+                flux.append(aux[0].data[rmin:rmax, cmin:cmax])
+                flux_err.append(aux[1].data[rmin:rmax, cmin:cmax])
+                aux.close()
+        # get data from ASDF, this could be an FFI or a cutout
+        elif self.file_format_in == "asdf":
+            rmin -= self.row_min_data
+            rmax -= self.row_min_data
+            cmin -= self.column_min_data
+            cmax -= self.column_min_data
+            row_range = np.arange(rmin, rmax)
+            col_range = np.arange(cmin, cmax)
+
+            cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
+            flux = cont["roman"]["data"]["flux"][:][:, row_range[row_range >= 0]][
+                :, :, col_range[col_range >= 0]
+            ]
+            flux_err = cont["roman"]["data"]["flux_err"][:][
+                :, row_range[row_range >= 0]
+            ][:, :, col_range[col_range >= 0]]
+        else:
+            raise ValueError("File format not supported")
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
         self.row = np.arange(rmin, rmax)
+        self.row = self.row[self.row >= 0]
+        self.row += self.row_min_data
         self.column = np.arange(cmin, cmax)
+        self.column = self.column[self.column >= 0]
+        self.column += self.column_min_data
+        self.target_pixel = np.array(
+            [
+                (self.row.min() + self.row.max()) / 2,
+                (self.column.min() + self.column.max()) / 2,
+            ]
+        )
         return
 
     @functools.lru_cache(maxsize=6)
@@ -278,7 +351,7 @@ class RomanCuts:
         # set starting pixel
         if len(center.shape) != 2:
             raise ValueError("`center` must be a 2D array with shape (nt, 2) or (1, 2)")
-        if center.shape[0] != len(self.file_list) and not center.shape[0] == 1:
+        if center.shape[0] != self.nt:
             raise ValueError(
                 "The number of rows in `center` must match the number of files in `file_list`"
             )
@@ -286,6 +359,7 @@ class RomanCuts:
             log.info("Using the same center for all frames, dithering not accounted.")
             center = np.tile(center, (len(self.file_list), 1))
 
+        # get range of requested row/column pixels
         row0 = center[:, 0] - int(size[0] / 2)
         col0 = center[:, 1] - int(size[1] / 2)
         rmin = RMIN + row0
@@ -293,32 +367,98 @@ class RomanCuts:
         rmax = rmin + size[0]
         cmax = cmin + size[1]
 
+        # make sure at least 50% of the requested data is on detector
         if (
-            (rmin > RMAX).any()
-            | (cmin > CMAX).any()
-            | (rmax > RMAX).any()
-            | (cmax > CMAX).any()
+            (center[:, 0] - int(size[0] / 4) < self.row_min_data).any()
+            | (center[:, 1] - int(size[1] / 4) < self.column_min_data).any()
+            | (center[:, 0] + int(size[0] / 4) >= self.row_max_data).any()
+            | (center[:, 1] + int(size[1] / 4) >= self.column_max_data).any()
         ):
             raise ValueError(
                 "Cutout out of CCD limits. This is due to the dithered observations"
                 " and the size of the cutout. Please reduce the size or change the center."
             )
+        # get data from FITS assuming is the FFI
+        if self.file_format_in == "fits":
+            flux = []
+            flux_err = []
+            for i, f in tqdm(
+                enumerate(self.file_list),
+                total=len(self.file_list),
+                desc="Extracting cutout",
+            ):
+                aux = fits.open(f)
+                flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+                flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+                aux.close()
+        # get data from ASDF, this could be an FFI or a cutout
+        elif self.file_format_in == "asdf":
+            # reset range to array index in the data
+            rmin -= self.row_min_data
+            rmax -= self.row_min_data
+            cmin -= self.column_min_data
+            cmax -= self.column_min_data
+            flux = []
+            flux_err = []
 
-        flux = []
-        flux_err = []
-        for i, f in tqdm(enumerate(self.file_list), total=len(self.file_list)):
-            aux = fits.open(f)
-            flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
-            flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
-            aux.close()
+            cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
+            for i in range(self.nt):
+                # find which requested row/column are in data range
+                row_range = np.arange(rmin[i], rmax[i])
+                col_range = np.arange(cmin[i], cmax[i])
+                row_in_mask = (row_range >= 0) & (row_range < self.image_size[0])
+                col_in_mask = (col_range >= 0) & (col_range < self.image_size[1])
+                mask = row_in_mask[:, None] * col_in_mask[None, :]
+                # requested pixels outside the image range are filled in with nans
+                # to keep the cutout size consistent.
+                # we accept up to 25% nan row/column in each edge
+                aux = np.zeros((size[0], size[1])) * np.nan
+                aux[np.where(mask)] = cont["roman"]["data"]["flux"][i][
+                    row_range[row_in_mask]
+                ][:, col_range[col_in_mask]].ravel()
+                flux.append(aux)
+                aux = np.zeros((size[0], size[1])) * np.nan
+                aux[np.where(mask)] = cont["roman"]["data"]["flux_err"][i][
+                    row_range[row_in_mask]
+                ][:, col_range[col_in_mask]].ravel()
+                flux_err.append(aux)
+        else:
+            raise ValueError("File format not supported")
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
         self.row = np.vstack([np.arange(rn, rx) for rn, rx in zip(rmin, rmax)])
+        self.row += self.row_min_data
         self.column = np.vstack([np.arange(cn, cx) for cn, cx in zip(cmin, cmax)])
+        self.column += self.column_min_data
         return
 
     def _get_arrays(self):
+        if self.file_format_in == "fits":
+            self._fits_arrays()
+        elif self.file_format_in == "asdf":
+            self._asdf_arrays()
+        return
+
+    def _asdf_arrays(self):
+        """
+        Extracts time, exposureno, and quality arrays from the ASDF file.
+        """
+        with asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True) as cont:
+            self.time = cont["roman"]["data"]["time"].copy()
+            self.exposureno = cont["roman"]["data"]["exposureno"].copy()
+            self.quality = cont["roman"]["data"]["quality"].copy()
+            self.row_min_data = cont["roman"]["data"]["row"]
+            self.column_min_data = cont["roman"]["data"]["column"]
+            self.row_max_data = (
+                cont["roman"]["data"]["row"] + cont["roman"]["meta"]["IMGSIZE"][0]
+            )
+            self.column_max_data = (
+                cont["roman"]["data"]["column"] + cont["roman"]["meta"]["IMGSIZE"][1]
+            )
+        return
+
+    def _fits_arrays(self):
         """
         Extracts time, exposureno, and quality arrays from the FFI files.
         """
@@ -332,8 +472,28 @@ class RomanCuts:
         self.time = np.array(time)
         self.exposureno = np.array(exposureno)
         self.quality = np.array(quality)
+        self.row_min_data = RMIN
+        self.column_min_data = CMIN
+        self.row_max_data = RMAX
+        self.column_max_data = CMAX
+        return
 
     def _get_metadata(self):
+        if self.file_format_in == "fits":
+            self._fits_metadata()
+        elif self.file_format_in == "asdf":
+            self._asdf_metadata()
+        return
+
+    def _asdf_metadata(self):
+        """
+        Extracts metadata from the ASDF file.
+        """
+        with asdf.open(self.file_list[0], lazy_tree=False, lazy_load=True) as cont:
+            self.metadata = cont["roman"]["meta"].copy()
+        return
+
+    def _fits_metadata(self):
         """
         Extracts metadata from the first FFI file.
         """
@@ -356,7 +516,7 @@ class RomanCuts:
             "RA_CEN": float(self.ra) if hasattr(self, "ra") else None,
             "DEC_CEN": float(self.dec) if hasattr(self, "dec") else None,
             "DITHERED": self.dithered if hasattr(self, "dithered") else None,
-            "NTIMES": self.nt,
+            "NTIMES": len(self.file_list),
             "IMGSIZE": self.flux.shape[1:] if hasattr(self, "flux") else None,
         }
 
