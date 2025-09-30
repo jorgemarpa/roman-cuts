@@ -93,7 +93,9 @@ class RomanCuts:
         elif self.file_format_in in ["fits", "FITS"]:
             if len(self.file_list) == 1:
                 # currently not supporting data cubes in FITS
-                raise NotImplementedError
+                # this only works for single FFI
+                self._check_file_list()
+                # raise NotImplementedError
             else:
                 self._check_file_list()
             # list of ASDF files, each is a frame
