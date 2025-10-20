@@ -124,11 +124,13 @@ class RomanCuts:
                 sca.append(hdr["DETECTOR"])
                 filter.append(hdr["FILTER"])
             if self.file_format_in == "asdf":
-                datamodel = asdf.open(f, lazy_tree=True, lazy_load=True)
-                sca.append(datamodel["roman"]["meta"]["DETECTOR"])
-                field.append(datamodel["roman"]["meta"]["FIELD"])
-                filter.append(datamodel["roman"]["meta"]["FILTER"])
-                datamodel.close()
+                self.asdf_model = asdf.open(f, lazy_tree=True, lazy_load=True)
+                sca.append(self.asdf_model["roman"]["meta"]["DETECTOR"])
+                field.append(self.asdf_model["roman"]["meta"]["FIELD"])
+                filter.append(self.asdf_model["roman"]["meta"]["FILTER"])
+                self.mmap_flux = self.asdf_model.tree["roman"]["data"]["flux"]
+                self.mmap_flux_err = self.asdf_model.tree["roman"]["data"]["flux_err"]
+                # self.asdf_model.close()
 
         if len(set(field)) > 1:
             raise ValueError("File list contains more than one field")
@@ -307,11 +309,11 @@ class RomanCuts:
             row_range = np.arange(rmin, rmax)
             col_range = np.arange(cmin, cmax)
 
-            cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
-            flux = cont["roman"]["data"]["flux"][:][:, row_range[row_range >= 0]][
+            # cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
+            flux = self.mmap_flux[:][:, row_range[row_range >= 0]][
                 :, :, col_range[col_range >= 0]
             ]
-            flux_err = cont["roman"]["data"]["flux_err"][:][
+            flux_err = self.mmap_flux_err[:][
                 :, row_range[row_range >= 0]
             ][:, :, col_range[col_range >= 0]]
         else:
@@ -403,7 +405,7 @@ class RomanCuts:
             flux = []
             flux_err = []
 
-            cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
+            # cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
             for i in range(self.nt):
                 # find which requested row/column are in data range
                 row_range = np.arange(rmin[i], rmax[i])
@@ -415,12 +417,12 @@ class RomanCuts:
                 # to keep the cutout size consistent.
                 # we accept up to 25% nan row/column in each edge
                 aux = np.zeros((size[0], size[1])) * np.nan
-                aux[np.where(mask)] = cont["roman"]["data"]["flux"][i][
+                aux[np.where(mask)] = self.mmap_flux[i][
                     row_range[row_in_mask]
                 ][:, col_range[col_in_mask]].ravel()
                 flux.append(aux)
                 aux = np.zeros((size[0], size[1])) * np.nan
-                aux[np.where(mask)] = cont["roman"]["data"]["flux_err"][i][
+                aux[np.where(mask)] = self.mmap_flux_err[i][
                     row_range[row_in_mask]
                 ][:, col_range[col_in_mask]].ravel()
                 flux_err.append(aux)
@@ -446,18 +448,18 @@ class RomanCuts:
         """
         Extracts time, exposureno, and quality arrays from the ASDF file.
         """
-        with asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True) as cont:
-            self.time = cont["roman"]["data"]["time"].copy()
-            self.exposureno = cont["roman"]["data"]["exposureno"].copy()
-            self.quality = cont["roman"]["data"]["quality"].copy()
-            self.row_min_data = cont["roman"]["data"]["row"]
-            self.column_min_data = cont["roman"]["data"]["column"]
-            self.row_max_data = (
-                cont["roman"]["data"]["row"] + cont["roman"]["meta"]["IMGSIZE"][0]
-            )
-            self.column_max_data = (
-                cont["roman"]["data"]["column"] + cont["roman"]["meta"]["IMGSIZE"][1]
-            )
+        # with asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True) as cont:
+        self.time = self.asdf_model["roman"]["data"]["time"].copy()
+        self.exposureno = self.asdf_model["roman"]["data"]["exposureno"].copy()
+        self.quality = self.asdf_model["roman"]["data"]["quality"].copy()
+        self.row_min_data = self.asdf_model["roman"]["data"]["row"]
+        self.column_min_data = self.asdf_model["roman"]["data"]["column"]
+        self.row_max_data = (
+            self.asdf_model["roman"]["data"]["row"] + self.asdf_model["roman"]["meta"]["IMGSIZE"][0]
+        )
+        self.column_max_data = (
+            self.asdf_model["roman"]["data"]["column"] + self.asdf_model["roman"]["meta"]["IMGSIZE"][1]
+        )
         return
 
     def _fits_arrays(self):
@@ -491,8 +493,8 @@ class RomanCuts:
         """
         Extracts metadata from the ASDF file.
         """
-        with asdf.open(self.file_list[0], lazy_tree=False, lazy_load=True) as cont:
-            self.metadata = cont["roman"]["meta"].copy()
+        # with asdf.open(self.file_list[0], lazy_tree=False, lazy_load=True) as cont:
+        self.metadata = self.asdf_model["roman"]["meta"].copy()
         return
 
     def _fits_metadata(self):
