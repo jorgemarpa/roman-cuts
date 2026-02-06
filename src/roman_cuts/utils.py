@@ -1,5 +1,6 @@
 """Utilities to help work with cube data"""
 
+import os
 import numpy as np
 import pandas as pd
 from astropy.io import fits
@@ -123,7 +124,7 @@ def extract_all_WCS(file_list: list):
             exp_no = hdu["EXP_NO"]
         else:
             exp_no = int(
-                f.split("_")[-2]
+                os.path.basename(f).split("_")[8]
             )  # assuming the file name contains the exposure number
         frame_no.append(exp_no)
 

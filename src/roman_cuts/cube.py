@@ -39,6 +39,7 @@ class RomanCuts:
         filter: str = "F146",
         file_list: list = [],
         file_format: str = "fits",
+        file_version: str = "1.0",
     ):
         """
         Initializes the class with field, scs, filter, and file_list.
@@ -59,6 +60,7 @@ class RomanCuts:
         self.sca = sca
         self.filter = filter
         self.file_format_in = file_format
+        self.file_version = file_version
 
         if len(file_list) == 0:
             raise ValueError("Please provide a list of FFI files in `file_list`")
@@ -146,7 +148,7 @@ class RomanCuts:
         """
         # check if wcs is in disk
         dir = f"{PACKAGEDIR}/data/wcs/"
-        filename = f"{dir}Roman_WFI_wcs_field{self.field:03}_sca{self.sca:02}_{self.filter}.json.bz2"
+        filename = f"{dir}Roman_WFI_wcs_field{self.field:03}_sca{self.sca:02}_{self.filter}_v{self.file_version}.json.bz2"
         if not os.path.isfile(filename):
             # if not compute a new one and save it to disk
             self.wcs = extract_average_WCS(self.file_list)
@@ -166,7 +168,7 @@ class RomanCuts:
         """
         # check if wcs is in disk
         dir = f"{PACKAGEDIR}/data/wcs/"
-        filename = f"{dir}Roman_WFI_wcss_field{self.field:03}_sca{self.sca:02}_{self.filter}.json.bz2"
+        filename = f"{dir}Roman_WFI_wcss_field{self.field:03}_sca{self.sca:02}_{self.filter}_v{self.file_version}.json.bz2"
         if not os.path.isfile(filename):
             # if not compute a new one and save it to disk
             wcss_df = extract_all_WCS(self.file_list)
@@ -471,7 +473,7 @@ class RomanCuts:
             hdu = fits.getheader(f)
             time.append((hdu["TSTART"] + hdu["TEND"]) / 2.0)
             # replace these two to corresponding keywords in future simulations
-            exposureno.append(int(f.split("_")[-2]))
+            exposureno.append(int(os.path.basename(f).split("_")[8]))
             quality.append(0)
         self.time = np.array(time)
         self.exposureno = np.array(exposureno)
@@ -508,13 +510,14 @@ class RomanCuts:
             "TELESCOP": "Roman",
             "CREATOR": "TRExS-roman-cuts",
             "SOFTWARE": hdus["SOFTWARE"],
+            "FILEVER": self.file_version,
             "RADESYS": hdus["RADESYS"],
             "EQUINOX": hdus["EQUINOX"],
             "FILTER": hdus["FILTER"],
-            "FIELD": int(self.file_list[0].split("_")[-5][-2:]),
+            "FIELD": int(os.path.basename(self.file_list[0]).split("_")[5][-2:]),
             "DETECTOR": hdus["DETECTOR"],
             "EXPOSURE": hdus["EXPOSURE"],
-            "READMODE": self.file_list[0].split("_")[-4],
+            "READMODE": os.path.basename(self.file_list[0]).split("_")[6],
             "TSTART": hdus["TSTART"],
             "TEND": hduf["TEND"],
             "RA_CEN": float(self.ra) if hasattr(self, "ra") else None,
