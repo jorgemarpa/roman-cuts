@@ -375,27 +375,58 @@ class RomanCuts:
 
         # make sure at least 50% of the requested data is on detector
         if (
-            (center[:, 0] - int(size[0] / 4) < self.row_min_data).any()
-            | (center[:, 1] - int(size[1] / 4) < self.column_min_data).any()
-            | (center[:, 0] + int(size[0] / 4) >= self.row_max_data).any()
-            | (center[:, 1] + int(size[1] / 4) >= self.column_max_data).any()
+            (center[:, 0] - int(size[0]) < self.row_min_data).any()
+            | (center[:, 1] - int(size[1]) < self.column_min_data).any()
+            | (center[:, 0] + int(size[0]) >= self.row_max_data).any()
+            | (center[:, 1] + int(size[1]) >= self.column_max_data).any()
         ):
-            raise ValueError(
+            print(
                 "Cutout out of CCD limits. This is due to the dithered observations"
-                " and the size of the cutout. Please reduce the size or change the center."
+                " and the size of the cutout. Some pixels will have nan values."
             )
         # get data from FITS assuming is the FFI
         if self.file_format_in == "fits":
-            flux = []
-            flux_err = []
+            flux = np.zeros((self.nt, size[0], size[1])) * np.nan
+            flux_err = np.zeros((self.nt, size[0], size[1])) * np.nan
+            print(flux.shape)
             for i, f in tqdm(
                 enumerate(self.file_list),
                 total=len(self.file_list),
                 desc="Extracting cutout",
             ):
                 aux = fits.open(f)
-                flux.append(aux[0].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
-                flux_err.append(aux[1].data[rmin[i] : rmax[i], cmin[i] : cmax[i]])
+                # only grab on detector data
+                if (rmax[i] > self.row_max_data):
+                    img_rmax = self.row_max_data
+                else:
+                    img_rmax = rmax[i]
+                if (cmax[i] > self.column_max_data):
+                    img_cmax = self.column_max_data
+                else:
+                    img_cmax = cmax[i]
+                if (rmin[i] < self.row_min_data):
+                    img_rmin = self.row_min_data
+                else:
+                    img_rmin = rmin[i]
+                if (cmin[i] < self.column_min_data):
+                    img_cmin = self.column_min_data
+                else:
+                    img_cmin = cmin[i]
+                
+                cutout_rmin = int(img_rmin - row0[i])
+                cutout_rmax = int(img_rmax - row0[i])
+                cutout_cmin = int(img_cmin - col0[i])
+                cutout_cmax = int(img_cmax - col0[i])
+
+                print(img_rmin, img_rmax, img_cmin, img_cmax)
+                print(cutout_rmin, cutout_rmax, cutout_cmin, cutout_cmax)
+
+                flux[i, cutout_rmin:cutout_rmax, cutout_cmin:cutout_cmax] = aux[0].data[
+                    img_rmin : img_rmax, img_cmin : img_cmax
+                ]
+                flux_err[i, cutout_rmin:cutout_rmax, cutout_cmin:cutout_cmax] = aux[
+                    1
+                ].data[img_rmin : img_rmax, img_cmin : img_cmax]
                 aux.close()
         # get data from ASDF, this could be an FFI or a cutout
         elif self.file_format_in == "asdf":
@@ -431,6 +462,7 @@ class RomanCuts:
         else:
             raise ValueError("File format not supported")
 
+        print(rmax, cmax)
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
         self.row = np.vstack([np.arange(rn, rx) for rn, rx in zip(rmin, rmax)])
@@ -480,8 +512,8 @@ class RomanCuts:
         self.quality = np.array(quality)
         self.row_min_data = RMIN
         self.column_min_data = CMIN
-        self.row_max_data = RMAX
-        self.column_max_data = CMAX
+        self.row_max_data = hdu["NROW"]
+        self.column_max_data = hdu["NCOL"]
         return
 
     def _get_metadata(self):
