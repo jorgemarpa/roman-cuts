@@ -380,7 +380,7 @@ class RomanCuts:
             | (center[:, 0] + int(size[0]) >= self.row_max_data).any()
             | (center[:, 1] + int(size[1]) >= self.column_max_data).any()
         ):
-            print(
+            log.warning(
                 "Cutout out of CCD limits. This is due to the dithered observations"
                 " and the size of the cutout. Some pixels will have nan values."
             )
@@ -388,7 +388,7 @@ class RomanCuts:
         if self.file_format_in == "fits":
             flux = np.zeros((self.nt, size[0], size[1])) * np.nan
             flux_err = np.zeros((self.nt, size[0], size[1])) * np.nan
-            print(flux.shape)
+
             for i, f in tqdm(
                 enumerate(self.file_list),
                 total=len(self.file_list),
@@ -418,8 +418,13 @@ class RomanCuts:
                 cutout_cmin = int(img_cmin - col0[i])
                 cutout_cmax = int(img_cmax - col0[i])
 
-                print(img_rmin, img_rmax, img_cmin, img_cmax)
-                print(cutout_rmin, cutout_rmax, cutout_cmin, cutout_cmax)
+                # print(img_rmin, img_rmax, img_cmin, img_cmax)
+                # print(cutout_rmin, cutout_rmax, cutout_cmin, cutout_cmax)
+                if img_rmin >= img_rmax or img_cmin >= img_cmax:
+                    log.warning(
+                        f"Cutout for frame {i} is completely out of CCD limits. Skipping."
+                    )
+                    continue
 
                 flux[i, cutout_rmin:cutout_rmax, cutout_cmin:cutout_cmax] = aux[0].data[
                     img_rmin : img_rmax, img_cmin : img_cmax
@@ -462,13 +467,15 @@ class RomanCuts:
         else:
             raise ValueError("File format not supported")
 
-        print(rmax, cmax)
+        # print(rmax, cmax)
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
         self.row = np.vstack([np.arange(rn, rx) for rn, rx in zip(rmin, rmax)])
         self.row += self.row_min_data
         self.column = np.vstack([np.arange(cn, cx) for cn, cx in zip(cmin, cmax)])
         self.column += self.column_min_data
+        if np.isnan(self.flux).all():
+            log.warning("All pixels in the cutout are out of CCD limits.")
         return
 
     def _get_arrays(self):
@@ -547,6 +554,7 @@ class RomanCuts:
             "EQUINOX": hdus["EQUINOX"],
             "FILTER": hdus["FILTER"],
             "FIELD": int(os.path.basename(self.file_list[0]).split("_")[5][-2:]),
+            "SCA": int(os.path.basename(self.file_list[0]).split("_")[4][-2:]),
             "DETECTOR": hdus["DETECTOR"],
             "EXPOSURE": hdus["EXPOSURE"],
             "READMODE": os.path.basename(self.file_list[0]).split("_")[6],
