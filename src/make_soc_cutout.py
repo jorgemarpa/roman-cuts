@@ -159,6 +159,7 @@ def worker_wrapper(
     #         "error": str(e)
     #     }
 
+
 def prepare_dict_for_asdf(input_dict: Dict[str, Any]) -> Dict[str, np.ndarray]:
     """
     Converts dictionary values into ASDF-serializable NumPy arrays based on type.
@@ -300,7 +301,7 @@ def main() -> None:
             result = future.result()
 
             if result["status"] == "success":
-                results_list[idx] = {
+                results_list[idx] = {  # type: ignore
                     "status": "success",
                     "data": result["flux"],
                     "metadata": result["metadata"],
@@ -311,7 +312,7 @@ def main() -> None:
                 logging.error(
                     f"Error handling entry {idx} [{result['file']}]: {result['error']}"
                 )
-                results_list[idx] = {
+                results_list[idx] = {  # type: ignore
                     "status": "failed",
                     "file": result["file"],
                     "error": result["error"],

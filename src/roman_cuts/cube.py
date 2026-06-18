@@ -315,19 +315,19 @@ class RomanCuts:
             flux = self.mmap_flux[:][:, row_range[row_range >= 0]][
                 :, :, col_range[col_range >= 0]
             ]
-            flux_err = self.mmap_flux_err[:][
-                :, row_range[row_range >= 0]
-            ][:, :, col_range[col_range >= 0]]
+            flux_err = self.mmap_flux_err[:][:, row_range[row_range >= 0]][
+                :, :, col_range[col_range >= 0]
+            ]
         else:
             raise ValueError("File format not supported")
 
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
         self.row = np.arange(rmin, rmax)
-        self.row = self.row[self.row >= 0]
+        self.row = self.row[self.row >= 0]  # type: ignore
         self.row += self.row_min_data
         self.column = np.arange(cmin, cmax)
-        self.column = self.column[self.column >= 0]
+        self.column = self.column[self.column >= 0]  # type: ignore
         self.column += self.column_min_data
         self.target_pixel = np.array(
             [
@@ -396,23 +396,23 @@ class RomanCuts:
             ):
                 aux = fits.open(f)
                 # only grab on detector data
-                if (rmax[i] > self.row_max_data):
+                if rmax[i] > self.row_max_data:
                     img_rmax = self.row_max_data
                 else:
                     img_rmax = rmax[i]
-                if (cmax[i] > self.column_max_data):
+                if cmax[i] > self.column_max_data:
                     img_cmax = self.column_max_data
                 else:
                     img_cmax = cmax[i]
-                if (rmin[i] < self.row_min_data):
+                if rmin[i] < self.row_min_data:
                     img_rmin = self.row_min_data
                 else:
                     img_rmin = rmin[i]
-                if (cmin[i] < self.column_min_data):
+                if cmin[i] < self.column_min_data:
                     img_cmin = self.column_min_data
                 else:
                     img_cmin = cmin[i]
-                
+
                 cutout_rmin = int(img_rmin - row0[i])
                 cutout_rmax = int(img_rmax - row0[i])
                 cutout_cmin = int(img_cmin - col0[i])
@@ -427,11 +427,11 @@ class RomanCuts:
                     continue
 
                 flux[i, cutout_rmin:cutout_rmax, cutout_cmin:cutout_cmax] = aux[0].data[
-                    img_rmin : img_rmax, img_cmin : img_cmax
+                    img_rmin:img_rmax, img_cmin:img_cmax
                 ]
                 flux_err[i, cutout_rmin:cutout_rmax, cutout_cmin:cutout_cmax] = aux[
                     1
-                ].data[img_rmin : img_rmax, img_cmin : img_cmax]
+                ].data[img_rmin:img_rmax, img_cmin:img_cmax]
                 aux.close()
         # get data from ASDF, this could be an FFI or a cutout
         elif self.file_format_in == "asdf":
@@ -440,8 +440,8 @@ class RomanCuts:
             rmax -= self.row_min_data
             cmin -= self.column_min_data
             cmax -= self.column_min_data
-            flux = []
-            flux_err = []
+            flux = []  # type: ignore
+            flux_err = []  # type: ignore
 
             # cont = asdf.open(self.file_list[0], lazy_tree=True, lazy_load=True)
             for i in range(self.nt):
@@ -455,24 +455,24 @@ class RomanCuts:
                 # to keep the cutout size consistent.
                 # we accept up to 25% nan row/column in each edge
                 aux = np.zeros((size[0], size[1])) * np.nan
-                aux[np.where(mask)] = self.mmap_flux[i][
-                    row_range[row_in_mask]
-                ][:, col_range[col_in_mask]].ravel()
-                flux.append(aux)
+                aux[np.where(mask)] = self.mmap_flux[i][row_range[row_in_mask]][
+                    :, col_range[col_in_mask]
+                ].ravel()
+                flux.append(aux)  # type: ignore
                 aux = np.zeros((size[0], size[1])) * np.nan
-                aux[np.where(mask)] = self.mmap_flux_err[i][
-                    row_range[row_in_mask]
-                ][:, col_range[col_in_mask]].ravel()
-                flux_err.append(aux)
+                aux[np.where(mask)] = self.mmap_flux_err[i][row_range[row_in_mask]][
+                    :, col_range[col_in_mask]
+                ].ravel()
+                flux_err.append(aux)  # type: ignore
         else:
             raise ValueError("File format not supported")
 
         # print(rmax, cmax)
         self.flux = np.array(flux)
         self.flux_err = np.array(flux_err)
-        self.row = np.vstack([np.arange(rn, rx) for rn, rx in zip(rmin, rmax)])
+        self.row = np.vstack([np.arange(rn, rx) for rn, rx in zip(rmin, rmax)])  # type: ignore
         self.row += self.row_min_data
-        self.column = np.vstack([np.arange(cn, cx) for cn, cx in zip(cmin, cmax)])
+        self.column = np.vstack([np.arange(cn, cx) for cn, cx in zip(cmin, cmax)])  # type: ignore
         self.column += self.column_min_data
         if np.isnan(self.flux).all():
             log.warning("All pixels in the cutout are out of CCD limits.")
@@ -496,10 +496,12 @@ class RomanCuts:
         self.row_min_data = self.asdf_model["roman"]["data"]["row"]
         self.column_min_data = self.asdf_model["roman"]["data"]["column"]
         self.row_max_data = (
-            self.asdf_model["roman"]["data"]["row"] + self.asdf_model["roman"]["meta"]["IMGSIZE"][0]
+            self.asdf_model["roman"]["data"]["row"]
+            + self.asdf_model["roman"]["meta"]["IMGSIZE"][0]
         )
         self.column_max_data = (
-            self.asdf_model["roman"]["data"]["column"] + self.asdf_model["roman"]["meta"]["IMGSIZE"][1]
+            self.asdf_model["roman"]["data"]["column"]
+            + self.asdf_model["roman"]["meta"]["IMGSIZE"][1]
         )
         return
 
