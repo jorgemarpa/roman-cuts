@@ -1,6 +1,7 @@
 """Utilities to help work with cube data"""
 
 import os
+
 import numpy as np
 import pandas as pd
 from astropy.io import fits
