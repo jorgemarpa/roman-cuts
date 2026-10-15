@@ -37,7 +37,9 @@ _KEEP_OBS = ["exposure", "observation", "observation_id", "visit"]
 _KEEP_INSTR = ["detector", "optical_element"]
 
 
-def make_cutout(file_names, ra, dec, size=(10, 10), mission=None, verbose=False, lite=False):
+def make_cutout(
+    file_names, ra, dec, size=(10, 10), mission=None, verbose=False, lite=False
+):
     """
     Create a pixel cutout (or cube of cutouts) from Roman WFI L2 ASDF files.
 
@@ -94,7 +96,7 @@ def make_cutout(file_names, ra, dec, size=(10, 10), mission=None, verbose=False,
 
     cutout_flx, meta_rows, gwcss = [], [], []
     if not lite:
-        cutout_err, cutout_dq = [], []
+        cutout_err, cutout_dq, cutout_dumo = [], [], []
 
     for fname in tqdm(file_names, desc="Extracting cutouts", unit="file"):
         with _open_asdf(fname, mission=mission) as af:
@@ -108,6 +110,7 @@ def make_cutout(file_names, ra, dec, size=(10, 10), mission=None, verbose=False,
                 if not lite:
                     cutout_err.append(np.full(size, np.nan))
                     cutout_dq.append(np.full(size, np.nan))
+                    cutout_dumo.append(np.full(size, np.nan))
                 gwcss.append(None)
                 meta_rows.append({})  # placeholder row for DataFrame
                 continue
@@ -137,9 +140,15 @@ def make_cutout(file_names, ra, dec, size=(10, 10), mission=None, verbose=False,
                     size=size,
                     mode="partial",
                 )
+                dumo = Cutout2D(
+                    af["roman"]["dumo"],
+                    position=(float(x_pix), float(y_pix)),
+                    size=size,
+                    mode="partial",
+                )
                 cutout_err.append(err.data.copy())
                 cutout_dq.append(dq.data.copy())
-
+                cutout_dumo.append(dumo.data.copy())
             # Build sliced GWCS for the cutout frame
             yslice, xslice = flx.slices_original
             gwcss.append(
@@ -182,7 +191,14 @@ def make_cutout(file_names, ra, dec, size=(10, 10), mission=None, verbose=False,
     if lite:
         cutout_cube = np.array(cutout_flx)
     else:
-        cutout_cube = np.array([np.array(cutout_flx), np.array(cutout_err), np.array(cutout_dq)])
+        cutout_cube = np.array(
+            [
+                np.array(cutout_flx),
+                np.array(cutout_err),
+                np.array(cutout_dq),
+                np.array(cutout_dumo),
+            ]
+        )
     metadata = pd.DataFrame(meta_rows)
 
     if single:
