@@ -15,7 +15,7 @@ from .cutout import make_cutout
 logger = logging.getLogger(__name__)
 
 
-def prepare_dict_for_asdf(df):
+def prepare_dict_for_asdf(input_dict):
     """
     Convert a metadata dict to ASDF-serialisable NumPy arrays.
 
@@ -24,10 +24,8 @@ def prepare_dict_for_asdf(df):
     - Strings → str arrays
     - Everything else → ``np.asarray``
     """
-    metadata_dict = {col: df[col].to_numpy() for col in df.columns}
-    metadata_dict["df_index"] = df.index.to_numpy()
     out = {}
-    for key, value in metadata_dict.items():
+    for key, value in input_dict.items():
         if isinstance(value[0], Time):
             out[key] = np.array([x.jd for x in value], dtype=float)
         elif isinstance(value[0], (tuple, list)):
@@ -55,6 +53,7 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename):
         Output file path (``*.asdf``).
     """
     meta_dict = {col: metadata[col].tolist() for col in metadata.columns}
+    meta_dict["df_index"] = metadata.index.to_numpy()
     meta_serial = prepare_dict_for_asdf(meta_dict)
 
     if cutout_cube.ndim == 4:
