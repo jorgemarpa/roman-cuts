@@ -121,12 +121,13 @@ def query_mast_files(
     filter_norm = filter_name.upper()
 
     if mission is None:
-        from astroquery.mast import MastMissions
+        from astroquery.mast import MastMissions, Observations
 
         mission = MastMissions(mission="roman")
         token = os.environ.get("MAST_API_TOKEN")
         if token:
             mission.login(token=token)
+        Observations.enable_cloud_dataset()
 
     level_info = FILE_TYPE_MAP[file_type]
 

@@ -18,7 +18,7 @@ asdf-astropy = ">=0.7"
 # ── Optional dependencies — install with: pip install roman-cuts[com] ─────────
 s3fs          = {version = ">=2025.9.0",  optional = true}
 roman-datamodels = {version = "^1.0.0",  optional = true}
-astroquery    = {version = ">=0.4.12.dev",  optional = true}
+astroquery    = {git = "https://github.com/astropy/astroquery.git", rev = "refs/pull/3593/head", optional = true}
 python-dotenv = {version = ">=1.0.0",       optional = true}
 pyarrow       = {version = ">=14.0",         optional = true}
 
