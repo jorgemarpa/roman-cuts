@@ -37,7 +37,7 @@ _KEEP_OBS = ["exposure", "observation", "observation_id", "visit"]
 _KEEP_INSTR = ["detector", "optical_element"]
 
 
-def make_cutout(file_names, ra, dec, size, mission=None, verbose=False, lite=False):
+def make_cutout(file_names, ra, dec, size=(10, 10), mission=None, verbose=False, lite=False):
     """
     Create a pixel cutout (or cube of cutouts) from Roman WFI L2 ASDF files.
 
