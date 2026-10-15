@@ -6,5 +6,6 @@ dist
 .ruff_cache
 poetry.lock
 .mypy_cache
-notebooks
 *.DS_Store
+notebooks/.ipynb_checkpoints
+notebooks/*.asdf
