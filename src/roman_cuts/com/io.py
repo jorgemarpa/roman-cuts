@@ -8,6 +8,9 @@ import s3fs
 import asdf
 import warnings
 import logging
+import requests
+import fsspec
+import pandas as pd
 from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
@@ -104,3 +107,35 @@ def _open_asdf(file_name, mission=None):
         # Local path — covers both SMDC-mounted S3 and ordinary local files
         with asdf.open(str(file_name), lazy_load=True) as af:
             yield af
+
+
+def open_catalog(filename, token):
+    """
+    Download a Parquet catalog from the MAST S3 bucket using a signed URL.
+
+    Fetches a pre-signed redirect URL from the MAST retrieve-product endpoint
+    using *token* for authentication, then streams the Parquet file into a
+    :class:`pandas.DataFrame` without writing to disk.
+
+    Parameters
+    ----------
+    filename : str
+        MAST product filename (e.g. ``"roman/path/to/catalog.parquet"``).
+    token : str
+        MAST API token used for the ``Authorization`` header.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Catalog contents loaded from the remote Parquet file.
+    """
+    resp = requests.get(
+        f"https://mast.stsci.edu/search/roman/api/v0.1/retrieve_product?product_name={filename}",
+        headers={"Authorization": f"token {token}"},
+        allow_redirects=False,
+    )
+    resp.raise_for_status()
+
+    fs = fsspec.filesystem("https")
+    with fs.open(resp.headers["Location"], "rb") as f:
+        return pd.read_parquet(f, engine="pyarrow")

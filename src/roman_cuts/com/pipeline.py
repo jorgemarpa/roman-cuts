@@ -140,7 +140,7 @@ def run_cutout_pipeline(
     gwcss : list or None
         All three are *None* when MAST returns no products.
     """
-    products = query_mast_files(
+    products, mission = query_mast_files(
         program_id,
         detector,
         filter_name,

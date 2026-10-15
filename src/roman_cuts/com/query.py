@@ -107,7 +107,6 @@ def query_mast_files(
         MAST product table.  Each row is one file; ``products['filename']``
         can be passed directly to `make_cutout`.
     """
-    from astroquery.mast import MastMissions
 
     file_type = file_type.lower()
     if file_type not in FILE_TYPE_MAP:
@@ -122,6 +121,8 @@ def query_mast_files(
     filter_norm = filter_name.upper()
 
     if mission is None:
+        from astroquery.mast import MastMissions
+
         mission = MastMissions(mission="roman")
         token = os.environ.get("MAST_API_TOKEN")
         if token:
@@ -167,4 +168,4 @@ def query_mast_files(
     )
 
     logger.info("Returning %d %s products.", len(products), file_type.upper())
-    return products
+    return products, mission
