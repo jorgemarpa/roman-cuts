@@ -3,18 +3,24 @@
 
 # Roman-cuts
 
-Lightweight package to create image cutouts from simulations made with `RImTimSim`
+Package to create image cutouts from simulations made with `RImTimSim` or from Roman Commissioning activities
 
 ## Install
 
-Easy install with PyPI
+Easy install with pip from your local clone of the repository
+```bash
+pip install -e .           # sim only (no cloud/MAST deps)
 ```
-pip install roman-cuts
+To use the tools with commissioning data, checkout this branch (`romcom`) and then run
+```bash
+pip install -e ".[com]"    # sim + com (all features)
 ```
 
 ## Usage
 
-For more details check out the notebook tutorial [here](./tutorial.ipynb).
+### Simulated images
+
+For more details check out the notebook tutorial [here](./notebooks/tutorial-sim.ipynb).
 
 ```python
 from roman_cuts import RomanCuts
@@ -35,6 +41,10 @@ rcube.make_cutout(rowcol=rowcol, size=(11, 11), dithered=False)
 # we can save to disk, default is ASDF
 rcube.save_cutout()
 ```
+
+### ROMCOM data
+
+See the tutorial [here](./notebooks/tutorial-com.ipynb).
 
 ## Examples
 The figure shows a sequence of 21x21 pixel cutouts taken from the FFI simulations 
