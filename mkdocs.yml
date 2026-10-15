@@ -1,12 +1,12 @@
 site_name: Roman Cuts
 nav:
-  - Home: index.md
+  - Home: README.md
   - API:
       - "Simulation (roman_cuts.sim)": sim.md
       - "Commissioning (roman_cuts.com)": com.md
   - Tutorials:
-      - "Simulation walkthrough": tutorial.ipynb
-      - "Commissioning walkthrough": com_tutorial.md
+      - "Simulation walkthrough": tutorial-sim.ipynb
+      - "Commissioning walkthrough": tutorial-com.ipynb
 
 extra:
   social:

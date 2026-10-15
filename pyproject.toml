@@ -3,7 +3,7 @@ name = "roman-cuts"
 version = "1.0.0"
 description = "Roman WFI cutout utilities — simulation (roman_cuts.sim) and commissioning data (roman_cuts.com)"
 authors = ["Jorge Martinez-Palomera <jorgemarpa@ug.uchile.cl>"]
-readme = "README.md"
+readme = "docs/README.md"
 
 # ── Core dependencies (required by both sim and com) ─────────────────────────
 [tool.poetry.dependencies]

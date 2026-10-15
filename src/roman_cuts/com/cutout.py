@@ -3,6 +3,7 @@ roman_cutouts.cutout
 ~~~~~~~~~~~~~~~~~~~~
 Pixel cutout extraction from Roman WFI L2 ASDF files using GWCS.
 """
+
 import logging
 import numpy as np
 import pandas as pd
@@ -36,7 +37,7 @@ _KEEP_OBS = ["exposure", "observation", "observation_id", "visit"]
 _KEEP_INSTR = ["detector", "optical_element"]
 
 
-def make_cutout(file_names, ra, dec, size, mission=None, verbose=False):
+def make_cutout(file_names, ra, dec, size, mission=None, verbose=False, lite=False):
     """
     Create a pixel cutout (or cube of cutouts) from Roman WFI L2 ASDF files.
 
@@ -91,7 +92,9 @@ def make_cutout(file_names, ra, dec, size, mission=None, verbose=False):
     if verbose:
         logger.info("Target: RA=%.6f  Dec=%.6f", ra, dec)
 
-    cutouts, meta_rows, gwcss = [], [], []
+    cutout_flx, meta_rows, gwcss = [], [], []
+    if not lite:
+        cutout_err, cutout_dq = [], []
 
     for fname in tqdm(file_names, desc="Extracting cutouts", unit="file"):
         with _open_asdf(fname, mission=mission) as af:
@@ -107,17 +110,32 @@ def make_cutout(file_names, ra, dec, size, mission=None, verbose=False):
 
             # Cutout2D reads the needed slice during __init__;
             # .copy() keeps the data valid after the ASDF file closes
-            cutout = Cutout2D(
+            flx = Cutout2D(
                 af["roman"]["data"],
                 position=(float(x_pix), float(y_pix)),
                 size=size,
                 mode="partial",
                 fill_value=np.nan,
             )
-            cutouts.append(cutout.data.copy())
+            cutout_flx.append(flx.data.copy())
+            if not lite:
+                err = Cutout2D(
+                    af["roman"]["err"],
+                    position=(float(x_pix), float(y_pix)),
+                    size=size,
+                    mode="partial",
+                )
+                dq = Cutout2D(
+                    af["roman"]["dq"],
+                    position=(float(x_pix), float(y_pix)),
+                    size=size,
+                    mode="partial",
+                )
+                cutout_err.append(err.data.copy())
+                cutout_dq.append(dq.data.copy())
 
             # Build sliced GWCS for the cutout frame
-            yslice, xslice = cutout.slices_original
+            yslice, xslice = flx.slices_original
             gwcss.append(
                 HighLevelWCSWrapper(SlicedLowLevelWCS(gwcs_obj, (yslice, xslice)))
             )
@@ -127,28 +145,41 @@ def make_cutout(file_names, ra, dec, size, mission=None, verbose=False):
             mid_t = exp_node.get("mid_time")
             if mid_t is None:
                 mid_t = Time(
-                    (Time(exp_node["start_time"]).jd + Time(exp_node["end_time"]).jd) / 2.0,
+                    (Time(exp_node["start_time"]).jd + Time(exp_node["end_time"]).jd)
+                    / 2.0,
                     format="jd",
                 )
             if not isinstance(mid_t, Time):
                 mid_t = Time(mid_t)
 
-            row = {k: cutout.__dict__[k] for k in _KEEP_CUTOUT if k in cutout.__dict__}
-            row |= {k: af["roman"]["meta"]["exposure"][k] for k in _KEEP_EXP
-                    if k in af["roman"]["meta"]["exposure"]}
-            row |= {k: af["roman"]["meta"]["observation"][k] for k in _KEEP_OBS
-                    if k in af["roman"]["meta"]["observation"]}
-            row |= {k: af["roman"]["meta"]["instrument"][k] for k in _KEEP_INSTR
-                    if k in af["roman"]["meta"]["instrument"]}
+            row = {k: flx.__dict__[k] for k in _KEEP_CUTOUT if k in flx.__dict__}
+            row |= {
+                k: af["roman"]["meta"]["exposure"][k]
+                for k in _KEEP_EXP
+                if k in af["roman"]["meta"]["exposure"]
+            }
+            row |= {
+                k: af["roman"]["meta"]["observation"][k]
+                for k in _KEEP_OBS
+                if k in af["roman"]["meta"]["observation"]
+            }
+            row |= {
+                k: af["roman"]["meta"]["instrument"][k]
+                for k in _KEEP_INSTR
+                if k in af["roman"]["meta"]["instrument"]
+            }
             row["mid_time"] = mid_t
             row["ra_target"] = ra
             row["dec_target"] = dec
             meta_rows.append(row)
 
-    cutout_cube = np.array(cutouts)
+    if lite:
+        cutout_cube = np.array(cutout_flx)
+    else:
+        cutout_cube = np.array([np.array(cutout_flx), np.array(cutout_err), np.array(cutout_dq)])
     metadata = pd.DataFrame(meta_rows)
 
     if single:
-        return cutout_cube[0], metadata.iloc[0], gwcss[0]
+        return cutout_cube[:, 0], metadata.iloc[0], gwcss[0]
 
     return cutout_cube, metadata, gwcss
