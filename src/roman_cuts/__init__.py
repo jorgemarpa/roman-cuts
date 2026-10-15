@@ -40,9 +40,6 @@ try:
 except metadata.PackageNotFoundError:
     __version__ = "0.0.0.dev"
 
-# Top-level PACKAGEDIR kept for legacy code that imported it directly
-PACKAGEDIR = os.path.abspath(os.path.dirname(__file__))
-
 log = logging.getLogger(__name__)
 
 # ── sim submodule (simulation data) ──────────────────────────────────────────
