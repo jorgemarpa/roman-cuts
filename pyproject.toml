@@ -21,10 +21,11 @@ roman-datamodels = {version = "^1.0.0",  optional = true}
 astroquery    = {git = "https://github.com/astropy/astroquery.git", rev = "refs/pull/3593/head", optional = true}
 python-dotenv = {version = ">=1.0.0",       optional = true}
 pyarrow       = {version = ">=14.0",         optional = true}
+ipywidgets    = {version = ">=7.6.3,<9.0.0", optional = true}
 
 [tool.poetry.extras]
-com = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow"]
-all = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow"]
+com = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "ipywidgets"]
+all = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "ipywidgets"]
 
 # ── Console scripts ───────────────────────────────────────────────────────────
 [tool.poetry.scripts]
@@ -34,7 +35,6 @@ roman-com-cutout = "roman_cuts.com.cli:main"
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 ruff = ">=0.5,<0.12"
-ipywidgets = ">=7.6.3,<9.0.0"
 mkdocs = "^1.6.0"
 mkdocs-material = "^9.5.0"
 mkdocstrings = {version = "^0.29.0", extras = ["python", "numpy-style"]}
