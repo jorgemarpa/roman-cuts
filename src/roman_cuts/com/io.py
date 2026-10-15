@@ -109,33 +109,39 @@ def _open_asdf(file_name, mission=None):
             yield af
 
 
-def open_catalog(filename, token):
+def open_parquet(filename, token):
     """
-    Download a Parquet catalog from the MAST S3 bucket using a signed URL.
+    Download one or more Parquet catalogs from the MAST S3 bucket using signed URLs.
 
     Fetches a pre-signed redirect URL from the MAST retrieve-product endpoint
-    using *token* for authentication, then streams the Parquet file into a
+    using *token* for authentication, then streams each Parquet file into a
     :class:`pandas.DataFrame` without writing to disk.
 
     Parameters
     ----------
-    filename : str
-        MAST product filename (e.g. ``"roman/path/to/catalog.parquet"``).
+    filename : str or list of str
+        MAST product filename(s) (e.g. ``"roman/path/to/catalog.parquet"``).
+        When a list is supplied a list of DataFrames is returned.
     token : str
         MAST API token used for the ``Authorization`` header.
 
     Returns
     -------
-    pandas.DataFrame
-        Catalog contents loaded from the remote Parquet file.
+    pandas.DataFrame or list of pandas.DataFrame
+        Catalog contents.  A single DataFrame when *filename* is a string;
+        a list of DataFrames when *filename* is a list.
     """
-    resp = requests.get(
-        f"https://mast.stsci.edu/search/roman/api/v0.1/retrieve_product?product_name={filename}",
-        headers={"Authorization": f"token {token}"},
-        allow_redirects=False,
-    )
-    resp.raise_for_status()
+    def _fetch_one(fname):
+        resp = requests.get(
+            f"https://mast.stsci.edu/search/roman/api/v0.1/retrieve_product?product_name={fname}",
+            headers={"Authorization": f"token {token}"},
+            allow_redirects=False,
+        )
+        resp.raise_for_status()
+        fs = fsspec.filesystem("https")
+        with fs.open(resp.headers["Location"], "rb") as f:
+            return pd.read_parquet(f, engine="pyarrow")
 
-    fs = fsspec.filesystem("https")
-    with fs.open(resp.headers["Location"], "rb") as f:
-        return pd.read_parquet(f, engine="pyarrow")
+    if isinstance(filename, str):
+        return _fetch_one(filename)
+    return [_fetch_one(fname) for fname in filename]
