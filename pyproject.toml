@@ -1,10 +1,11 @@
 [tool.poetry]
 name = "roman-cuts"
-version = "0.3.2"
-description = ""
+version = "1.0.0"
+description = "Roman WFI cutout utilities — simulation (roman_cuts.sim) and commissioning data (roman_cuts.com)"
 authors = ["Jorge Martinez-Palomera <jorgemarpa@ug.uchile.cl>"]
 readme = "README.md"
 
+# ── Core dependencies (required by both sim and com) ─────────────────────────
 [tool.poetry.dependencies]
 python = "^3.11"
 numpy = ">1.26,<2.4"
@@ -13,9 +14,21 @@ pandas = ">1.5,<3.0"
 astropy = ">5,<7"
 tqdm = "^4.67.1"
 asdf-astropy = ">=0.7"
-s3fs = ">=2025.9.0"
-roman-datamodels = "^1.0.0"
 
+# ── Optional dependencies — install with: pip install roman-cuts[com] ─────────
+s3fs          = {version = ">=2025.9.0",  optional = true}
+roman-datamodels = {version = "^1.0.0",  optional = true}
+astroquery    = {version = ">=0.4.9",     optional = true}
+
+[tool.poetry.extras]
+com = ["s3fs", "roman-datamodels", "astroquery"]
+all = ["s3fs", "roman-datamodels", "astroquery"]
+
+# ── Console scripts ───────────────────────────────────────────────────────────
+[tool.poetry.scripts]
+roman-com-cutout = "roman_cuts.com.cli:main"
+
+# ── Development dependencies ──────────────────────────────────────────────────
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
 ruff = ">=0.5,<0.12"
@@ -31,11 +44,9 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
-# Assumes Python 3.9
 target-version = "py311"
 
 [tool.ruff.lint]
-# Enable Pyflakes (`F`), a subset of pycodestyle (`E`) and isort (`I`).
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.mypy]

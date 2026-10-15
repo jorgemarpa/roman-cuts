@@ -1,29 +1,67 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from __future__ import absolute_import
+"""
+roman_cuts
+==========
+Roman WFI cutout utilities — simulation data and commissioning/science data.
 
+Two submodules are provided:
+
+``roman_cuts.sim``
+    Cutouts from local FITS/ASDF simulation files produced by RImTimSim.
+    OOP interface centred on the :class:`~roman_cuts.sim.RomanCuts` class.
+
+``roman_cuts.com``
+    Cutouts from MAST-archived commissioning and science ASDF files accessed
+    via the MAST API or S3.  Functional interface via :func:`make_cutout`,
+    :func:`query_mast_files`, and :func:`run_cutout_pipeline`.
+
+Quick start
+-----------
+**Simulation data (local FITS)**::
+
+    from roman_cuts import RomanCuts           # or: from roman_cuts.sim import RomanCuts
+    rcube = RomanCuts(field=3, sca=1, filter="F146", file_list=[...])
+    rcube.make_cutout(radec=(268.46, -29.23), size=(21, 21), dithered=True)
+    rcube.save_cutout()
+
+**Commissioning data (MAST cloud)**::
+
+    from roman_cuts import query_mast_files, make_cutout
+    products = query_mast_files(1055, 5, "F146", observation=13, mission=mission)
+    cube, meta, gwcss = make_cutout(products["filename"].tolist(), ra, dec, 100,
+                                    mission=mission)
+"""
+import logging
 import os
 from importlib import metadata
 
-# reads version number from package metadata
-__version__ = metadata.version(__package__)
+try:
+    __version__ = metadata.version(__package__)
+except metadata.PackageNotFoundError:
+    __version__ = "0.0.0.dev"
 
+# Top-level PACKAGEDIR kept for legacy code that imported it directly
 PACKAGEDIR = os.path.abspath(os.path.dirname(__file__))
 
-import logging  # noqa: E402
+log = logging.getLogger(__name__)
 
+# ── sim submodule (simulation data) ──────────────────────────────────────────
+from .sim import RomanCuts  # noqa: E402
 
-def get_logger():
-    """
-    Creates a logger
-    """
-    logger = logging.getLogger(__name__)
-    # logger.addHandler(logging.StreamHandler())
-    return logger
+# ── com submodule (commissioning / science data) ─────────────────────────────
+from .com import (  # noqa: E402
+    make_cutout,
+    query_mast_files,
+    run_cutout_pipeline,
+    save_to_asdf,
+)
 
-
-log = get_logger()
-
-from .cube import RomanCuts  # noqa
-
-__all__ = ["RomanCuts"]
+__all__ = [
+    # sim
+    "RomanCuts",
+    # com
+    "query_mast_files",
+    "make_cutout",
+    "run_cutout_pipeline",
+    "save_to_asdf",
+]
