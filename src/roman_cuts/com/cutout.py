@@ -104,6 +104,12 @@ def make_cutout(file_names, ra, dec, size, mission=None, verbose=False, lite=Fal
             x_pix, y_pix = gwcs_obj.world_to_pixel(target)
             if np.isnan(x_pix) or np.isnan(y_pix):
                 logger.debug("Skipping %s — target outside image bounds.", fname)
+                cutout_flx.append(np.full(size, np.nan))
+                if not lite:
+                    cutout_err.append(np.full(size, np.nan))
+                    cutout_dq.append(np.full(size, np.nan))
+                gwcss.append(None)
+                meta_rows.append({})  # placeholder row for DataFrame
                 continue
             if verbose:
                 logger.info("  %s  →  pixel (%.2f, %.2f)", fname, x_pix, y_pix)
