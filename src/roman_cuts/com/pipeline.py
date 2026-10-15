@@ -15,7 +15,7 @@ from .cutout import make_cutout
 logger = logging.getLogger(__name__)
 
 
-def prepare_dict_for_asdf(input_dict):
+def prepare_dict_for_asdf(df):
     """
     Convert a metadata dict to ASDF-serialisable NumPy arrays.
 
@@ -24,8 +24,10 @@ def prepare_dict_for_asdf(input_dict):
     - Strings → str arrays
     - Everything else → ``np.asarray``
     """
+    metadata_dict = {col: df[col].to_numpy() for col in df.columns}
+    metadata_dict["df_index"] = df.index.to_numpy()
     out = {}
-    for key, value in input_dict.items():
+    for key, value in metadata_dict.items():
         if isinstance(value[0], Time):
             out[key] = np.array([x.jd for x in value], dtype=float)
         elif isinstance(value[0], (tuple, list)):
