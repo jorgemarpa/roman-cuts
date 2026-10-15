@@ -54,7 +54,7 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename):
     """
     meta_dict = {col: metadata[col].tolist() for col in metadata.columns}
     meta_dict["df_index"] = metadata.index.to_numpy()
-    meta_serial = prepare_dict_for_asdf(meta_dict)
+    # meta_serial = prepare_dict_for_asdf(meta_dict)
 
     if cutout_cube.ndim == 4:
         data = cutout_cube[0]
@@ -73,13 +73,16 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename):
 
     tree = {
         "roman": {
-            "meta": meta_serial,
+            "meta": meta_dict,
             "wcs": gwcss,
             "data": data,
             "err": err,
             "dq": dq,
             "dumo": dumo,
-            "time": np.array([t.jd for t in metadata["mid_time"]], dtype=float),
+            "time": [
+                float(x.jd) if isinstance(x, Time) else np.nan
+                for x in metadata["mid_time"].values
+            ],
             "quality": np.zeros(len(metadata), dtype=np.int16),
         }
     }
