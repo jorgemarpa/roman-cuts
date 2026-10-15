@@ -55,11 +55,29 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename):
     meta_dict = {col: metadata[col].tolist() for col in metadata.columns}
     meta_serial = prepare_dict_for_asdf(meta_dict)
 
+    if cutout_cube.ndim == 4:
+        data = cutout_cube[0]
+        err = cutout_cube[1]
+        dq = cutout_cube[2]
+        dumo = cutout_cube[3]
+    elif cutout_cube.ndim == 3:
+        data = cutout_cube
+        err = None
+        dq = None
+        dumo = None
+    else:
+        raise ValueError(
+            f"cutout_cube must be 3-D or 4-D, got {cutout_cube.ndim}-D."
+        )
+
     tree = {
         "roman": {
             "meta": meta_serial,
             "wcs": gwcss,
-            "data": cutout_cube,
+            "data": data,
+            "err": err,
+            "dq": dq,
+            "dumo": dumo,
             "time": np.array([t.jd for t in metadata["mid_time"]], dtype=float),
             "quality": np.zeros(len(metadata), dtype=np.int16),
         }
