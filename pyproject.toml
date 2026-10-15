@@ -19,10 +19,11 @@ asdf-astropy = ">=0.7"
 s3fs          = {version = ">=2025.9.0",  optional = true}
 roman-datamodels = {version = "^1.0.0",  optional = true}
 astroquery    = {version = ">=0.4.12.dev",  optional = true}
+python-dotenv = {version = ">=1.0.0",       optional = true}
 
 [tool.poetry.extras]
-com = ["s3fs", "roman-datamodels", "astroquery"]
-all = ["s3fs", "roman-datamodels", "astroquery"]
+com = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv"]
+all = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv"]
 
 # ── Console scripts ───────────────────────────────────────────────────────────
 [tool.poetry.scripts]
