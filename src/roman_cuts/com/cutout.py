@@ -108,6 +108,7 @@ def _placeholder(base_row, ra, dec):
     row = dict(base_row)
     row["ra_target"] = ra
     row["dec_target"] = dec
+    row["in_bounds"] = False
     return {"flx": None, "err": None, "dq": None, "dumo": None, "gwcs": None, "row": row}
 
 
@@ -185,6 +186,7 @@ def _extract_file(idx, fname, ras, decs, sizes, lite, verbose, platform, mission
                 row |= base_row
                 row["ra_target"] = ra_t
                 row["dec_target"] = dec_t
+                row["in_bounds"] = True
                 entry["row"] = row
                 targets.append(entry)
             return {"idx": idx, "mid_jd": float(mid_t.jd), "targets": targets}
@@ -266,7 +268,10 @@ def make_cutout(
     metadatas : list of `~pandas.DataFrame`
         One per target, ``n_files`` rows with exposure, observation and
         instrument columns, ``mid_time``, ``ra_target``, ``dec_target`` and
-        Cutout2D geometry fields.
+        Cutout2D geometry fields.  The boolean ``in_bounds`` column is
+        *False* for NaN entries (target outside the file's footprint, or the
+        file failed) and *True* otherwise, including partial overlaps, which
+        are NaN-padded.
     gwcsss : list of list of `~astropy.wcs.wcsapi.HighLevelWCSWrapper`
         One per target, ``n_files`` sliced GWCS objects (*None* for NaN
         entries).  ``gwcsss[t][k].world_to_pixel(SkyCoord(...))`` returns

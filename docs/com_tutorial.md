@@ -65,8 +65,10 @@ Notes:
 - Outputs are sorted by `mid_time`; `cubes[t]`, `metas[t]` and `gwcsss[t]` share
   the same time axis (`n_files`).
 - A target that falls outside a file's footprint is kept as NaN (and `None` in
-  `gwcsss`). Files that fail to open are also NaN and sorted last, unless
-  `strict=True`.
+  `gwcsss`), and its metadata row has `in_bounds=False`; its exposure columns
+  and `mid_time` are still filled, but the Cutout2D geometry columns are NaN.
+  Files that fail to open are also NaN with `in_bounds=False`, sorted last,
+  unless `strict=True`. Use `metas[t]["in_bounds"]` to select valid epochs.
 - `lite=True` extracts the data plane only, shape `(1, n_files, ny, nx)`.
 
 ## Saving

@@ -93,6 +93,8 @@ def test_multi_target_sizes_and_oob(files):
     assert np.all(np.isnan(cubes[1]))
     assert all(g is None for g in gwcsss[1])
     assert len(metas[1]) == 4
+    assert not metas[1]["in_bounds"].any()
+    assert metas[0]["in_bounds"].all() and metas[2]["in_bounds"].all()
     # in-bounds targets match single-target calls
     for t in (0, 2):
         ref, _, _ = make_cutout(files, ras[t], decs[t], size=cubes[t].shape[2:], lite=True)
