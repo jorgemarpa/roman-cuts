@@ -3,14 +3,16 @@ roman_cutouts.pipeline
 ~~~~~~~~~~~~~~~~~~~~~~
 High-level pipeline and ASDF serialisation helpers.
 """
-import os
-import asdf
 import logging
+import os
+import re
+
+import asdf
 import numpy as np
 from astropy.time import Time
 
-from .query import query_mast_files
 from .cutout import make_cutout
+from .query import query_mast_files
 
 logger = logging.getLogger(__name__)
 
@@ -37,30 +39,40 @@ def prepare_dict_for_asdf(input_dict):
     return out
 
 
-def save_to_asdf(cutout_cube, metadata, gwcss, filename):
+def _default_filename(metadata):
     """
-    Serialise a cutout cube, metadata, and sliced GWCS list to an ASDF file.
+    Build ``cutouts_{pid}_{detector}_{filter}_{ra:.6f}_{dec:.6f}.asdf`` in the cwd.
 
-    Parameters
-    ----------
-    cutout_cube : ndarray
-        Shape ``(N, ny, nx)``.
-    metadata : `~pandas.DataFrame`
-        Per-exposure metadata as returned by `make_cutout`.
-    gwcss : list
-        Per-cutout sliced GWCS objects.
-    filename : str
-        Output file path (``*.asdf``).
+    The program number ``pid`` is the leading ``PPPPP`` of the ``observation_id``
+    metadata column (``PPPPPCCAAASSSOOOVVV`` — program, execution plan, pass,
+    segment, observation, visit), tolerating an optional leading ``r``.
     """
+    def first(col):
+        if col not in metadata:
+            return "unknown"
+        valid = metadata[col].dropna()
+        return valid.iloc[0] if len(valid) else "unknown"
+
+    match = re.match(r"^[A-Za-z]?(\d{5})", str(first("observation_id")))
+    pid = match.group(1) if match else "unknown"
+    return (
+        f"cutouts_{pid}_{first('detector')}_{first('optical_element')}"
+        f"_{float(first('ra_target')):.6f}_{float(first('dec_target')):.6f}.asdf"
+    )
+
+
+def _save_one(cutout_cube, metadata, gwcss, filename):
+    """Write a single target's cube, metadata and GWCS list to *filename*."""
     meta_dict = {col: metadata[col].tolist() for col in metadata.columns}
     meta_dict["df_index"] = metadata.index.to_numpy()
     # meta_serial = prepare_dict_for_asdf(meta_dict)
 
     if cutout_cube.ndim == 4:
         data = cutout_cube[0]
-        err = cutout_cube[1]
-        dq = cutout_cube[2]
-        dumo = cutout_cube[3]
+        has_all = cutout_cube.shape[0] >= 4
+        err = cutout_cube[1] if has_all else None
+        dq = cutout_cube[2] if has_all else None
+        dumo = cutout_cube[3] if has_all else None
     elif cutout_cube.ndim == 3:
         data = cutout_cube
         err = None
@@ -90,6 +102,66 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename):
     logger.info("Wrote %s", filename)
 
 
+def save_to_asdf(cutout_cube, metadata, gwcss, filename=None):
+    """
+    Serialise cutout cubes, metadata, and sliced GWCS lists to ASDF files.
+
+    One file is written **per target**.  Pass the lists returned by
+    `make_cutout` (``N`` targets → ``N`` files) or the arrays of a single
+    target.
+
+    Parameters
+    ----------
+    cutout_cube : ndarray or list of ndarray
+        Per-target cube(s), shape ``(n_types, n_files, ny, nx)``
+        (``[data, err, dq, dumo]``, or data only when ``n_types == 1``) or
+        ``(n_files, ny, nx)``.  A bare array is treated as one target.
+    metadata : `~pandas.DataFrame` or list of `~pandas.DataFrame`
+        Per-exposure metadata as returned by `make_cutout`.
+    gwcss : list or list of list
+        Per-cutout sliced GWCS objects (one list per target when *cutout_cube*
+        is a list).
+    filename : str or list of str, optional
+        Output file path(s) (``*.asdf``).  With ``N > 1`` targets it must be a
+        list of length ``N``.  When *None*, each file is written to the
+        current directory as
+        ``cutouts_{pid}_{detector}_{filter}_{ra:.6f}_{dec:.6f}.asdf``, with
+        ``pid`` parsed from the leading ``PPPPP`` of the ``observation_id``
+        metadata column (``PPPPPCCAAASSSOOOVVV``), and detector
+        (``detector``), filter (``optical_element``) and coordinates
+        (``ra_target``, ``dec_target``) also taken from the metadata.
+        Missing values are written as ``unknown``.
+
+    Returns
+    -------
+    list of str
+        The paths written, one per target.
+    """
+    if isinstance(cutout_cube, (list, tuple)):
+        cubes, metas, gwcsss = list(cutout_cube), list(metadata), list(gwcss)
+    else:
+        cubes, metas, gwcsss = [cutout_cube], [metadata], [gwcss]
+    n = len(cubes)
+    if not (len(metas) == len(gwcsss) == n):
+        raise ValueError(
+            "cutout_cube, metadata and gwcss must have the same number of targets "
+            f"(got {n}, {len(metas)}, {len(gwcsss)})."
+        )
+
+    if filename is None:
+        filenames = [_default_filename(m) for m in metas]
+    else:
+        filenames = [filename] if isinstance(filename, (str, os.PathLike)) else list(filename)
+        if len(filenames) != n:
+            raise ValueError(
+                f"filename must have one entry per target ({n}), got {len(filenames)}."
+            )
+
+    for cube, meta, gw, fname in zip(cubes, metas, gwcsss, filenames):
+        _save_one(cube, meta, gw, fname)
+    return [str(f) for f in filenames]
+
+
 def run_cutout_pipeline(
     ra,
     dec,
@@ -107,6 +179,8 @@ def run_cutout_pipeline(
     output_path=None,
     mission=None,
     verbose=False,
+    n_workers=8,
+    backend="thread",
 ):
     """
     End-to-end pipeline: query MAST → extract cutouts → optionally save.
@@ -122,16 +196,16 @@ def run_cutout_pipeline(
 
     Parameters
     ----------
-    ra, dec : float
-        ICRS coordinates of the cutout centre (degrees).
+    ra, dec : float or sequence of float
+        ICRS coordinates of the cutout centre(s) (degrees).
     program_id : int
         Roman program ID.
     detector : str or int
         WFI detector (``'WFI05'``, ``5``, ``'05'`` …).
     filter_name : str
         Optical element (``'F146'``, ``'f106'`` …).
-    cutout_size : int or tuple of int
-        Cutout size in pixels (square or ``(ny, nx)``).
+    cutout_size : int, tuple of int, or list
+        Cutout size in pixels (square, ``(ny, nx)``, or one per target).
     file_type : ``'l1'`` | ``'l2'`` | ``'l4'``
         Data level.  Default ``'l2'``.
     execution_plan : int, optional
@@ -154,12 +228,17 @@ def run_cutout_pipeline(
         when *None*.
     verbose : bool
         Forward verbose flag to `make_cutout`.
+    n_workers : int
+        Parallel workers used by `make_cutout`.  Default 8.
+    backend : ``'thread'`` | ``'process'``
+        Parallel backend used by `make_cutout`.  Default ``'thread'``.
 
     Returns
     -------
-    cutout_cube : ndarray or None
-    metadata : `~pandas.DataFrame` or None
-    gwcss : list or None
+    cutout_cubes : list of ndarray or None
+        One cube per target, shape ``(4, n_files, ny, nx)``.
+    metadatas : list of `~pandas.DataFrame` or None
+    gwcsss : list of list or None
         All three are *None* when MAST returns no products.
     """
     products, mission = query_mast_files(
@@ -185,8 +264,9 @@ def run_cutout_pipeline(
         logger.info("Capped to %d files (max_files=%d).", len(file_names), max_files)
 
     logger.info("Running make_cutout on %d files.", len(file_names))
-    cutout_cube, metadata, gwcss = make_cutout(
+    cutout_cubes, metadatas, gwcsss = make_cutout(
         file_names, ra, dec, cutout_size, mission=mission, verbose=verbose,
+        n_workers=n_workers, backend=backend,
     )
 
     if output_path is not None:
@@ -206,12 +286,16 @@ def run_cutout_pipeline(
         if visit is not None:
             hier += f"_vis{visit:03d}"
 
-        out_file = os.path.join(
-            output_path,
-            f"roman_cutout_p{program_id:05d}{hier}"
-            f"_{det_str}_{filter_name.upper()}"
-            f"_ra{ra:.5f}_dec{dec:.5f}.asdf",
-        )
-        save_to_asdf(cutout_cube, metadata, gwcss, out_file)
+        # One output file per target; RA/Dec in the name keeps them distinct
+        filenames = [
+            os.path.join(
+                output_path,
+                f"roman_cutout_p{program_id:05d}{hier}"
+                f"_{det_str}_{filter_name.upper()}"
+                f"_ra{ra_t:.5f}_dec{dec_t:.5f}.asdf",
+            )
+            for ra_t, dec_t in zip(np.atleast_1d(ra), np.atleast_1d(dec))
+        ]
+        save_to_asdf(cutout_cubes, metadatas, gwcsss, filenames)
 
-    return cutout_cube, metadata, gwcss
+    return cutout_cubes, metadatas, gwcsss

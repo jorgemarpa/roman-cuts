@@ -3,15 +3,17 @@ roman_cutouts.io
 ~~~~~~~~~~~~~~~~
 Platform detection and ASDF file-opening helpers.
 """
-import os
-import s3fs
-import asdf
-import warnings
 import logging
-import requests
+import os
+import warnings
+from contextlib import contextmanager
+from functools import lru_cache
+
+import asdf
 import fsspec
 import pandas as pd
-from contextlib import contextmanager
+import requests
+import s3fs
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +50,25 @@ def _detect_platform():
     return "standalone"
 
 
+@lru_cache(maxsize=None)
+def _get_default_mission():
+    """Build (once per process) a ``MastMissions`` object from ``MAST_API_TOKEN``."""
+    from astroquery.mast import MastMissions
+    mission = MastMissions(mission="roman")
+    token = os.environ.get("MAST_API_TOKEN")
+    if token:
+        mission.login(token=token)
+    return mission
+
+
+@lru_cache(maxsize=None)
+def _get_s3fs(anon):
+    """Return a cached `s3fs.S3FileSystem` (one per process and credential mode)."""
+    return s3fs.S3FileSystem(anon=anon)
+
+
 @contextmanager
-def _open_asdf(file_name, mission=None):
+def _open_asdf(file_name, mission=None, platform=None):
     """
     Open an ASDF file from the appropriate backend for the current platform.
 
@@ -77,28 +96,26 @@ def _open_asdf(file_name, mission=None):
     mission : `~astroquery.mast.MastMissions`, optional
         Logged-in mission object.  Supplying one forces the RRN/MAST path
         regardless of the detected platform.
+    platform : {'rrn', 'smdc', 'standalone'}, optional
+        Precomputed platform.  Pass it when opening many files so that
+        detection (which may probe the network) runs only once.
     """
     from asdf.exceptions import AsdfWarning
     warnings.filterwarnings("ignore", category=AsdfWarning)
 
-    platform = _detect_platform()
+    if platform is None:
+        platform = _detect_platform()
 
     if mission is not None or platform == "rrn":
         # RRN: restricted data via the MAST streaming API
         if mission is None:
-            from astroquery.mast import MastMissions
-            mission = MastMissions(mission="roman")
-            token = os.environ.get("MAST_API_TOKEN")
-            if token:
-                mission.login(token=token)
+            mission = _get_default_mission()
         product = mission.read_product(file_name)
         yield product
 
     elif str(file_name).startswith("s3://"):
-        if platform == "smdc":
-            fs = s3fs.S3FileSystem(anon=False)   # SMDC: IAM role credentials
-        else:
-            fs = s3fs.S3FileSystem(anon=True)    # standalone: public S3
+        # SMDC: IAM role credentials; standalone: public S3
+        fs = _get_s3fs(platform != "smdc")
         with fs.open(file_name, "rb") as f:
             with asdf.open(f, lazy_load=True) as af:
                 yield af

@@ -27,10 +27,11 @@ def build_parser():
 
     # ── Target position ────────────────────────────────────────────────────────
     pos = parser.add_argument_group("Target position")
-    pos.add_argument("--ra", type=float, required=True,
-                     help="Right Ascension of the cutout centre (deg, ICRS).")
-    pos.add_argument("--dec", type=float, required=True,
-                     help="Declination of the cutout centre (deg, ICRS).")
+    pos.add_argument("--ra", type=float, nargs="+", required=True,
+                     help="Right Ascension(s) of the cutout centre(s) (deg, ICRS).")
+    pos.add_argument("--dec", type=float, nargs="+", required=True,
+                     help="Declination(s) of the cutout centre(s) (deg, ICRS); "
+                          "same count as --ra.")
 
     # ── Data selection ─────────────────────────────────────────────────────────
     data = parser.add_argument_group("Data selection")
@@ -65,16 +66,38 @@ def build_parser():
 
     # ── Cutout and output ──────────────────────────────────────────────────────
     out = parser.add_argument_group("Cutout and output")
-    out.add_argument("--cutout-size", type=int, default=25,
-                     help="Cutout side length in pixels.")
+    out.add_argument("--cutout-size", type=str, nargs="+", default=["25"],
+                     metavar="SIZE",
+                     help="Cutout size in pixels: N (square) or NY,NX. One value is "
+                          "shared by all targets; otherwise give one per target.")
     out.add_argument("--max-files", type=int, default=None,
                      help="Process at most this many files (useful for testing).")
     out.add_argument("--output-path", type=str, default=None,
-                     help="Directory for the output ASDF file. Omit to skip saving.")
+                     help="Directory for the output ASDF file(s). Omit to skip saving.")
     out.add_argument("--verbose", action="store_true",
                      help="Print per-file pixel-coordinate messages.")
 
+    par = parser.add_argument_group("Parallelization")
+    par.add_argument("--n-workers", type=int, default=8,
+                     help="Number of parallel workers (1 = serial).")
+    par.add_argument("--backend", choices=["thread", "process"], default="thread",
+                     help="Parallel backend.")
+
     return parser
+
+
+def _parse_sizes(tokens):
+    """Convert ``['25', '40,30']`` to ``[25, (40, 30)]``; a single entry is unwrapped."""
+    sizes = []
+    for tok in tokens:
+        parts = [int(p) for p in tok.split(",")]
+        if len(parts) == 1:
+            sizes.append(parts[0])
+        elif len(parts) == 2:
+            sizes.append((parts[0], parts[1]))
+        else:
+            raise ValueError(f"Invalid --cutout-size value {tok!r}; use N or NY,NX.")
+    return sizes[0] if len(sizes) == 1 else sizes
 
 
 def main():
@@ -91,7 +114,7 @@ def main():
         program_id=args.program_id,
         detector=args.detector,
         filter_name=args.filter,
-        cutout_size=args.cutout_size,
+        cutout_size=_parse_sizes(args.cutout_size),
         file_type=args.file_type,
         execution_plan=args.execution_plan,
         pass_num=args.pass_num,
@@ -101,4 +124,6 @@ def main():
         max_files=args.max_files,
         output_path=args.output_path,
         verbose=args.verbose,
+        n_workers=args.n_workers,
+        backend=args.backend,
     )
