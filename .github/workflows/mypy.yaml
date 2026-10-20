@@ -25,7 +25,7 @@ jobs:
         - name: Install dependencies
           run: |
             python -m pip install --upgrade pip
-            poetry install --with dev
+            poetry install --with dev --all-extras
         
         - name: Run mypy
           run: make mypy
