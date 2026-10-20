@@ -6,17 +6,18 @@ Pixel cutout extraction from Roman WFI L2 ASDF files using GWCS.
 
 import logging
 import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+
 import numpy as np
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from tqdm.auto import tqdm
-from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.coordinates import SkyCoord
 from astropy.nddata import Cutout2D, NoOverlapError
 from astropy.time import Time
-from astropy.wcs.wcsapi import SlicedLowLevelWCS, HighLevelWCSWrapper
+from astropy.wcs.wcsapi import HighLevelWCSWrapper, SlicedLowLevelWCS
+from tqdm.auto import tqdm
 
-from .io import _open_asdf, _detect_platform
+from .io import _detect_platform, _open_asdf
 
 logger = logging.getLogger(__name__)
 

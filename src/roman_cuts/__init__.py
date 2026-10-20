@@ -32,7 +32,6 @@ Quick start
                                     mission=mission)
 """
 import logging
-import os
 from importlib import metadata
 
 try:
@@ -43,8 +42,6 @@ except metadata.PackageNotFoundError:
 log = logging.getLogger(__name__)
 
 # ── sim submodule (simulation data) ──────────────────────────────────────────
-from .sim import RomanCuts  # noqa: E402
-
 # ── com submodule (commissioning / science data) ─────────────────────────────
 from .com import (  # noqa: E402
     make_cutout,
@@ -52,6 +49,7 @@ from .com import (  # noqa: E402
     run_cutout_pipeline,
     save_to_asdf,
 )
+from .sim import RomanCuts  # noqa: E402
 
 __all__ = [
     # sim

@@ -3,16 +3,17 @@ roman_cutouts.io
 ~~~~~~~~~~~~~~~~
 Platform detection and ASDF file-opening helpers.
 """
-import os
-import s3fs
-import asdf
-import warnings
 import logging
-import requests
-import fsspec
-import pandas as pd
+import os
+import warnings
 from contextlib import contextmanager
 from functools import lru_cache
+
+import asdf
+import fsspec
+import pandas as pd
+import requests
+import s3fs
 
 logger = logging.getLogger(__name__)
 

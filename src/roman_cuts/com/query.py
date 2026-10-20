@@ -3,8 +3,8 @@ roman_cutouts.query
 ~~~~~~~~~~~~~~~~~~~
 MAST archive query helpers for Roman WFI data products.
 """
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 

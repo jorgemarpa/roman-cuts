@@ -5,7 +5,7 @@ memory.
 
 import pytest
 
-from roman_cuts import RomanCuts           # top-level re-export (backwards compat)
+from roman_cuts import RomanCuts  # top-level re-export (backwards compat)
 from roman_cuts.sim import RomanCuts as RomanCutsSim  # explicit submodule path
 
 

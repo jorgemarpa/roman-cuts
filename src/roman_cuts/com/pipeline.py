@@ -3,15 +3,16 @@ roman_cutouts.pipeline
 ~~~~~~~~~~~~~~~~~~~~~~
 High-level pipeline and ASDF serialisation helpers.
 """
-import os
-import asdf
 import logging
+import os
 import re
+
+import asdf
 import numpy as np
 from astropy.time import Time
 
-from .query import query_mast_files
 from .cutout import make_cutout
+from .query import query_mast_files
 
 logger = logging.getLogger(__name__)
 

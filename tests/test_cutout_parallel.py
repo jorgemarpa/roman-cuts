@@ -1,16 +1,19 @@
 """Tests for parallel, multi-target, time-sorted make_cutout."""
+
+import asdf
 import numpy as np
 import pytest
-
-asdf = pytest.importorskip("asdf")
-pytest.importorskip("gwcs")
-
-from astropy import coordinates as coord, units as u
+from astropy import coordinates as coord
+from astropy import units as u
 from astropy.modeling import models
 from astropy.time import Time
-from gwcs import coordinate_frames as cf, wcs as gwcs_wcs
+from gwcs import coordinate_frames as cf
+from gwcs import wcs as gwcs_wcs
 
-from roman_cuts.com.cutout import make_cutout, _normalize_targets
+from roman_cuts.com.cutout import _normalize_targets, make_cutout
+
+pytest.importorskip("asdf")
+pytest.importorskip("gwcs")
 
 RA0, DEC0 = 150.0, 2.0
 SHAPE = (100, 100)
@@ -27,7 +30,9 @@ def _make_gwcs():
         | models.RotateNative2Celestial(RA0, DEC0, 180)
     )
     detector = cf.Frame2D(name="detector", axes_order=(0, 1), unit=(u.pix, u.pix))
-    sky = cf.CelestialFrame(reference_frame=coord.ICRS(), name="icrs", unit=(u.deg, u.deg))
+    sky = cf.CelestialFrame(
+        reference_frame=coord.ICRS(), name="icrs", unit=(u.deg, u.deg)
+    )
     return gwcs_wcs.WCS([(detector, det2sky), (sky, None)])
 
 
@@ -97,7 +102,9 @@ def test_multi_target_sizes_and_oob(files):
     assert metas[0]["in_bounds"].all() and metas[2]["in_bounds"].all()
     # in-bounds targets match single-target calls
     for t in (0, 2):
-        ref, _, _ = make_cutout(files, ras[t], decs[t], size=cubes[t].shape[2:], lite=True)
+        ref, _, _ = make_cutout(
+            files, ras[t], decs[t], size=cubes[t].shape[2:], lite=True
+        )
         np.testing.assert_array_equal(cubes[t], ref[0])
         _check_sorted(cubes[t], metas[t], gwcsss[t], 4)
 
@@ -118,4 +125,3 @@ def test_failed_file_is_nan_and_last(files, tmp_path):
     assert np.all(np.isnan(cubes[0][:, -1]))
     with pytest.raises(Exception):
         make_cutout([bad], RA0, DEC0, size=4, strict=True)
-
