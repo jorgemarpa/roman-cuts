@@ -9,3 +9,4 @@ poetry.lock
 *.DS_Store
 notebooks/.ipynb_checkpoints
 notebooks/*.asdf
+.rnn_jupyter
