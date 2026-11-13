@@ -8,7 +8,7 @@ readme = "docs/README.md"
 # ── Core dependencies (required by both sim and com) ─────────────────────────
 [tool.poetry.dependencies]
 python = "^3.11"
-numpy = ">1.26,<2.4"
+numpy = ">1.26,<2.5"
 matplotlib = "^3.10.1"
 pandas = ">1.5,<3.0"
 astropy = ">5,<8"
