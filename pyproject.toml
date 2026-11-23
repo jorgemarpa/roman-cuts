@@ -22,10 +22,11 @@ astroquery    = {git = "https://github.com/astropy/astroquery.git", rev = "refs/
 python-dotenv = {version = ">=1.0.0",       optional = true}
 pyarrow       = {version = ">=14.0",         optional = true}
 fsspec        = {version = ">=2024.1.0",     optional = true}
+boto3         = {version = ">=1.42.0",     optional = true}
 
 [tool.poetry.extras]
-com = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "fsspec"]
-all = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "fsspec"]
+com = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "fsspec", "boto3"]
+all = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "fsspec", "boto3"]
 
 # ── Console scripts ───────────────────────────────────────────────────────────
 [tool.poetry.scripts]
