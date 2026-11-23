@@ -14,6 +14,7 @@ import fsspec
 import pandas as pd
 import requests
 import s3fs
+import socket
 
 logger = logging.getLogger(__name__)
 
@@ -36,18 +37,14 @@ def _detect_platform():
         return override
 
     # RRN: STScI JupyterHub sets JUPYTERHUB_USER; /teams is the shared filesystem
-    if os.environ.get("JUPYTERHUB_USER") or os.path.isdir("/teams"):
+    hostname = socket.gethostname()
+    if "jupyter" in hostname:
         return "rrn"
-
     # SMDC: running on an AWS EC2/ECS instance — link-local metadata is reachable
-    try:
-        import urllib.request
-        urllib.request.urlopen("http://169.254.169.254/latest/meta-data/", timeout=0.3)
+    elif "hpc" in hostname:
         return "smdc"
-    except Exception:
-        pass
-
-    return "standalone"
+    else:
+        return "standalone"
 
 
 @lru_cache(maxsize=None)

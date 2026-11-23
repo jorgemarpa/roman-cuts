@@ -167,6 +167,7 @@ def query_mast_files(
     products = mission.filter_products(
         product_list, file_suffix=level_info["file_suffix"]
     )
+    products.sort("dataset")
 
     logger.info("Returning %d %s products.", len(products), file_type.upper())
     return products, mission
