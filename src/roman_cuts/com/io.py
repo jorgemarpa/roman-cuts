@@ -5,6 +5,7 @@ Platform detection and ASDF file-opening helpers.
 """
 import logging
 import os
+import socket
 import warnings
 from contextlib import contextmanager
 from functools import lru_cache
@@ -14,7 +15,6 @@ import fsspec
 import pandas as pd
 import requests
 import s3fs
-import socket
 
 logger = logging.getLogger(__name__)
 

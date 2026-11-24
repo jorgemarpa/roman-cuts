@@ -7,6 +7,7 @@ Verification tests for performance optimizations in roman_cuts.com:
 """
 
 import os
+
 import asdf
 import numpy as np
 import pytest

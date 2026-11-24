@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.nddata.utils import Cutout2D, NoOverlapError, overlap_slices
+from astropy.nddata.utils import NoOverlapError, overlap_slices
 from astropy.time import Time
 from astropy.wcs.wcsapi import HighLevelWCSWrapper, SlicedLowLevelWCS
 from tqdm.auto import tqdm
