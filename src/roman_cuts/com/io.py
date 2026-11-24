@@ -35,7 +35,11 @@ def _detect_platform():
     override = os.environ.get("ROMAN_ENV", "").lower()
     if override in ("rrn", "smdc", "standalone"):
         return override
+    return _cached_system_platform()
 
+
+@lru_cache(maxsize=1)
+def _cached_system_platform():
     # RRN: STScI JupyterHub sets JUPYTERHUB_USER; /teams is the shared filesystem
     hostname = socket.gethostname()
     if "jupyter" in hostname:
@@ -119,7 +123,7 @@ def _open_asdf(file_name, mission=None, platform=None):
 
     else:
         # Local path — covers both SMDC-mounted S3 and ordinary local files
-        with asdf.open(str(file_name), lazy_load=True) as af:
+        with asdf.open(str(file_name), memmap=True, lazy_load=True) as af:
             yield af
 
 
