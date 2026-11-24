@@ -6,6 +6,7 @@ High-level pipeline and ASDF serialisation helpers.
 import logging
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 
 import asdf
 import numpy as np
@@ -102,13 +103,13 @@ def _save_one(cutout_cube, metadata, gwcss, filename):
     logger.info("Wrote %s", filename)
 
 
-def save_to_asdf(cutout_cube, metadata, gwcss, filename=None):
+def save_to_asdf(cutout_cube, metadata, gwcss, filename=None, n_workers=8):
     """
     Serialise cutout cubes, metadata, and sliced GWCS lists to ASDF files.
 
     One file is written **per target**.  Pass the lists returned by
     `make_cutout` (``N`` targets → ``N`` files) or the arrays of a single
-    target.
+    target. Multi-target saving writes concurrently using a thread pool.
 
     Parameters
     ----------
@@ -131,6 +132,8 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename=None):
         (``detector``), filter (``optical_element``) and coordinates
         (``ra_target``, ``dec_target``) also taken from the metadata.
         Missing values are written as ``unknown``.
+    n_workers : int, optional
+        Number of concurrent threads for writing ASDF files. Default 8.
 
     Returns
     -------
@@ -157,8 +160,13 @@ def save_to_asdf(cutout_cube, metadata, gwcss, filename=None):
                 f"filename must have one entry per target ({n}), got {len(filenames)}."
             )
 
-    for cube, meta, gw, fname in zip(cubes, metas, gwcsss, filenames):
-        _save_one(cube, meta, gw, fname)
+    if n_workers <= 1 or n <= 1:
+        for cube, meta, gw, fname in zip(cubes, metas, gwcsss, filenames):
+            _save_one(cube, meta, gw, fname)
+    else:
+        with ThreadPoolExecutor(max_workers=min(n_workers, n)) as executor:
+            list(executor.map(lambda args: _save_one(*args), zip(cubes, metas, gwcsss, filenames)))
+
     return [str(f) for f in filenames]
 
 
@@ -296,6 +304,6 @@ def run_cutout_pipeline(
             )
             for ra_t, dec_t in zip(np.atleast_1d(ra), np.atleast_1d(dec))
         ]
-        save_to_asdf(cutout_cubes, metadatas, gwcsss, filenames)
+        save_to_asdf(cutout_cubes, metadatas, gwcsss, filenames, n_workers=n_workers)
 
     return cutout_cubes, metadatas, gwcsss

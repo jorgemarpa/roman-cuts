@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from astropy import units as u
 from astropy.coordinates import SkyCoord
-from astropy.nddata import Cutout2D, NoOverlapError
+from astropy.nddata.utils import NoOverlapError, overlap_slices
 from astropy.time import Time
 from astropy.wcs.wcsapi import HighLevelWCSWrapper, SlicedLowLevelWCS
 from tqdm.auto import tqdm
@@ -149,42 +149,81 @@ def _extract_file(idx, fname, ras, decs, sizes, lite, verbose, platform, mission
             base_row |= {k: instr_node[k] for k in _KEEP_INSTR if k in instr_node}
             base_row["mid_time"] = mid_t
 
-            # Sky → detector pixels for every target in one vectorised call (APE 14)
-            coords = SkyCoord(ra=ras * u.deg, dec=decs * u.deg, frame="icrs")
-            x_pix, y_pix = (np.atleast_1d(a) for a in gwcs_obj.world_to_pixel(coords))
+            # Sky → detector pixels for every target in one vectorised call
+            # Use world_to_pixel_values directly on each image's distinct gwcs_obj,
+            # accurately evaluating that exposure's pointing while avoiding SkyCoord wrapper overhead.
+            if hasattr(gwcs_obj, "world_to_pixel_values"):
+                x_pix, y_pix = (np.atleast_1d(a) for a in gwcs_obj.world_to_pixel_values(ras, decs))
+            else:
+                coords = SkyCoord(ra=ras * u.deg, dec=decs * u.deg, frame="icrs")
+                x_pix, y_pix = (np.atleast_1d(a) for a in gwcs_obj.world_to_pixel(coords))
+
+            img_shape = roman["data"].shape
+            img_ny, img_nx = img_shape
 
             targets = []
             for t, (ra_t, dec_t, size) in enumerate(zip(ras, decs, sizes)):
                 x, y = x_pix[t], y_pix[t]
+                ny, nx = size
                 if not (np.isfinite(x) and np.isfinite(y)):
                     logger.debug("Skipping %s — target %d outside image bounds.", fname, t)
                     targets.append(_placeholder(base_row, ra_t, dec_t))
                     continue
+
+                # Fast bounding box rejection: if target is completely outside image footprint + margin
+                if x < -nx or x >= img_nx + nx or y < -ny or y >= img_ny + ny:
+                    targets.append(_placeholder(base_row, ra_t, dec_t))
+                    continue
+
                 if verbose:
                     logger.info("  %s  target %d  →  pixel (%.2f, %.2f)", fname, t, x, y)
                 try:
-                    # Cutout2D reads the needed slice; .copy() outlives the file
-                    flx = Cutout2D(
-                        roman["data"],
-                        position=(float(x), float(y)),
-                        size=size,
-                        mode="partial",
-                        fill_value=np.nan,
-                    )
+                    sl_orig, sl_cut = overlap_slices(img_shape, size, (y, x), mode="partial")
                 except NoOverlapError:
                     targets.append(_placeholder(base_row, ra_t, dec_t))
                     continue
 
-                entry = {"flx": flx.data.copy(), "err": None, "dq": None, "dumo": None}
-                if not lite:
-                    for key in ("err", "dq", "dumo"):
-                        entry[key] = _cut_plane(roman[key], flx, size)
-                yslice, xslice = flx.slices_original
+                yslice, xslice = sl_orig
+                c_yslice, c_xslice = sl_cut
+
+                # Check if cutout is fully inside the detector bounds
+                is_full = (
+                    c_yslice.start == 0 and c_yslice.stop == ny and
+                    c_xslice.start == 0 and c_xslice.stop == nx
+                )
+
+                if is_full:
+                    flx_data = np.copy(roman["data"][yslice, xslice])
+                    entry = {"flx": flx_data, "err": None, "dq": None, "dumo": None}
+                    if not lite:
+                        for key in ("err", "dq", "dumo"):
+                            entry[key] = np.copy(roman[key][yslice, xslice])
+                else:
+                    flx_data = np.full(size, np.nan, dtype=float)
+                    flx_data[c_yslice, c_xslice] = roman["data"][yslice, xslice]
+                    entry = {"flx": flx_data, "err": None, "dq": None, "dumo": None}
+                    if not lite:
+                        for key in ("err", "dq", "dumo"):
+                            plane_data = np.full(size, np.nan, dtype=float)
+                            plane_data[c_yslice, c_xslice] = roman[key][yslice, xslice]
+                            entry[key] = plane_data
+
                 entry["gwcs"] = HighLevelWCSWrapper(
                     SlicedLowLevelWCS(gwcs_obj, (yslice, xslice))
                 )
-                row = {k: flx.__dict__[k] for k in _KEEP_CUTOUT if k in flx.__dict__}
-                row |= base_row
+
+                # Geometry attributes matching Cutout2D
+                row = dict(base_row)
+                row["input_position_original"] = (float(x), float(y))
+                row["origin_original"] = (xslice.start, yslice.start)
+                row["input_position_cutout"] = (
+                    float(x) - (xslice.start - c_xslice.start),
+                    float(y) - (yslice.start - c_yslice.start),
+                )
+                row["bbox_original"] = (
+                    (yslice.start, yslice.stop - 1),
+                    (xslice.start, xslice.stop - 1),
+                )
                 row["ra_target"] = ra_t
                 row["dec_target"] = dec_t
                 row["in_bounds"] = True
@@ -344,7 +383,7 @@ def make_cutout(
             rows.append(entry["row"])
             gwcss.append(entry["gwcs"])
         cutout_cubes.append(cube)
-        metadatas.append(pd.DataFrame(rows))
+        metadatas.append(pd.DataFrame.from_records(rows))
         gwcsss.append(gwcss)
 
     return cutout_cubes, metadatas, gwcsss
