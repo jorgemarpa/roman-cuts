@@ -22,18 +22,13 @@ pip install -e ".[com]"    # sim + com (all features)
 
 For more details check out the notebook tutorial [here](./tutorial-sim.ipynb).
 
-
-### ROMCOM data
-
-See the tutorial [here](./tutorial-com.ipynb).
-
 ## Examples
 The figure shows a sequence of 21x21 pixel cutouts taken from the FFI simulations 
 centered on the target RA, Decl = (268.5112137932491, -29.24473947250156).
 This account for dithered observations
 
-![cutouts](./docs/figures/cutout_example.png)
+![cutouts](./figures/cutout_example.png)
 
 The data is saved into a ASDF file as shown below:
 
-![asdf](./docs/figures/asdf_example.png)
+![asdf](./figures/asdf_example.png)

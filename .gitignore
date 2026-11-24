@@ -10,3 +10,6 @@ notebooks/.ipynb_checkpoints
 notebooks/*.asdf
 .rnn_jupyter
 .agents/
+
+# uv
+.venv/
