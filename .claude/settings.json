@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm /Users/jimartin/Work/ROMAN/TRExS/roman-cuts/src/roman_cuts/cube.py)"
+    ],
+    "additionalDirectories": [
+      "/Users/jimartin/Work/ROMAN/TRExS/roman-cuts/src/roman_cuts"
+    ]
+  }
+}
