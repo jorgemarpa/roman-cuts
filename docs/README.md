@@ -6,15 +6,28 @@
 
 # roman-cuts
 
-`roman-cuts` is a Python package designed to extract target-centered time-series image cutouts from observations taken with the **Nancy Grace Roman Space Telescope Wide Field Instrument (WFI)**. It provides unified support for both simulated images (such as synthetic full-frame images generated with `RImTimSim`) and real Roman Commissioning and science data products accessed through the Mikulski Archive for Space Telescopes (MAST).
+`roman-cuts` is a Python package designed to extract target-centered time-series image cutouts from observations taken with the **Nancy Grace Roman Space Telescope Wide Field Instrument (WFI)**. It provides unified support for both simulated images (such as synthetic full-frame images generated with `RImTimSim`) and real Roman science data products accessed through the Mikulski Archive for Space Telescopes (MAST).
 
 ---
 
 ## About NASA Roman & the Galactic Bulge Time Domain Survey
 
-The **Nancy Grace Roman Space Telescope** is NASA's next-generation flagship observatory, engineered to address critical questions in dark energy, exoplanet demographics, and infrared astrophysics. At its core is the **Wide Field Instrument (WFI)**, a 300-megapixel camera featuring 18 Sensor Chip Assemblies (SCAs) with a 0.281 deg² field of view—roughly 100 times the field of view of the Hubble Space Telescope at comparable angular resolution (0.11 arcsec/pixel).
+The **Nancy Grace Roman Space Telescope** is NASA's new flagship observatory, engineered to explore the infrared universe with unprecedented speed and precision. Its primary imaging camera, the **Wide Field Instrument (WFI)**, combines 18 Sensor Chip Assemblies (SCAs) totaling 300 megapixels to yield a 0.281 deg² field of view—roughly 100 times that of the Hubble Space Telescope at comparable resolution (0.11 arcsec/pixel).
 
-One of Roman's cornerstone community programs is the **Galactic Bulge Time Domain Survey (GBTDS)**. The GBTDS will monitor approximately 2 square degrees of the crowded Milky Way bulge with ~15-minute cadence across six 62-day observing seasons in the near-infrared. This high-precision time-domain imaging will discover thousands of bound and free-floating exoplanets via gravitational microlensing, measure millions of variable stars, and provide an extraordinary dataset for stellar astrophysics and Galactic structure. `roman-cuts` serves as the primary data extraction layer for the TRExS pipeline, preparing target cutout cubes for downstream effective PSF (ePSF) modeling and precision light curve extraction.
+A cornerstone community initiative of Roman is the **Galactic Bulge Time Domain Survey (GBTDS)**. By continuously monitoring ~2 square degrees in the dense, dust-obscured Milky Way bulge with ~12-minute sampling over six 62-day seasons in the near-infrared, the GBTDS will detect tens of thousands of exoplanets via the transiting method, discover stellar oscillations, and measure billions of stellar positions.
+
+### The TRExS Project: Transits in the Roman Galactic EXoplanet Survey
+
+**TRExS** ([Transits in the Roman Galactic EXoplanet Survey](https://www.stsci.edu/contents/events/roman/2023/november/transits-in-the-roman-galactic-exoplanet-survey-trexs)) is a Wide Field Science initiative designed to maximize the transit science return from Roman's GBTDS. While the GBTDS is nominally optimized for gravitational microlensing, its high-cadence time-series imaging of hundreds of millions of stars toward the Galactic Center makes it one of the most powerful transiting exoplanet surveys ever conceived.
+
+Key pillars of TRExS include:
+- **Massive Exoplanet Yields:** TRExS is predicted to discover between **60,000 and 200,000 transiting exoplanets**, expanding the catalog of known exoplanets by orders of magnitude compared to Kepler and TESS.
+- **Statistical Demographics of Rare Systems:** The enormous sample size places stringent demographic constraints on intrinsically rare planetary architectures, ultra-short-period planets, planets orbiting evolved or giant stars, and brown dwarf companions.
+- **Galactic Depth & Diversity:** Probing deep through the Galactic disk into the inner bulge, TRExS observes stars across diverse stellar populations, metallicities, and Galactic environments, mapping how planet occurrence varies throughout the Milky Way.
+- **Near-Infrared Atmospheres:** Leveraging Roman's near-infrared bandpass (WFI F146 and companion filters), TRExS enables direct atmospheric detection and thermal emission measurements (e.g., secondary eclipses and phase curves) for thousands of transiting giant planets at a population level.
+- **Survey Synergy:** By pairing transit discoveries with microlensing detections in the same survey footprint, Roman and TRExS will establish a unified census of planetary systems spanning orbital separations from <0.1 AU out to free-floating planets.
+
+Within the TRExS pipeline, `roman-cuts` serves as the primary data extraction layer, preparing target cutout cubes from full-frame images and cloud archives for downstream effective PSF (ePSF) modeling and precision light curve extraction.
 
 ---
 
