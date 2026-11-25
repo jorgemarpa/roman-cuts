@@ -1,50 +1,63 @@
-[tool.poetry]
+[project]
 name = "roman-cuts"
 version = "1.0.0"
 description = "Roman WFI cutout utilities — simulation (roman_cuts.sim) and commissioning data (roman_cuts.com)"
-authors = ["Jorge Martinez-Palomera <jorgemarpa@ug.uchile.cl>"]
+authors = [{name = "Jorge Martinez-Palomera", email = "jorgemarpa@ug.uchile.cl"}]
 readme = "docs/README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26,<2.5",
+    "matplotlib>=3.10.1,<4.0",
+    "pandas>1.5,<3.0",
+    "astropy>5,<8",
+    "tqdm>=4.67.1,<5.0",
+    "asdf-astropy>=0.7",
+]
 
-# ── Core dependencies (required by both sim and com) ─────────────────────────
-[tool.poetry.dependencies]
-python = "^3.11"
-numpy = ">1.26,<2.5"
-matplotlib = "^3.10.1"
-pandas = ">1.5,<3.0"
-astropy = ">5,<8"
-tqdm = "^4.67.1"
-asdf-astropy = ">=0.7"
+[project.optional-dependencies]
+com = [
+    "s3fs>=2025.9.0",
+    "roman-datamodels>=1.0.0,<2.0",
+    "astroquery",
+    "python-dotenv>=1.0.0",
+    "pyarrow>=14.0",
+    "fsspec>=2024.1.0",
+    "boto3>=1.42.0",
+]
+all = [
+    "s3fs>=2025.9.0",
+    "roman-datamodels>=1.0.0,<2.0",
+    "astroquery",
+    "python-dotenv>=1.0.0",
+    "pyarrow>=14.0",
+    "fsspec>=2024.1.0",
+    "boto3>=1.42.0",
+]
 
-# ── Optional dependencies — install with: pip install roman-cuts[com] ─────────
-s3fs          = {version = ">=2025.9.0",  optional = true}
-roman-datamodels = {version = "^1.0.0",  optional = true}
-astroquery    = {git = "https://github.com/astropy/astroquery.git", rev = "refs/pull/3593/head", optional = true}
-python-dotenv = {version = ">=1.0.0",       optional = true}
-pyarrow       = {version = ">=14.0",         optional = true}
-fsspec        = {version = ">=2024.1.0",     optional = true}
-boto3         = {version = ">=1.42.0",     optional = true}
-
-[tool.poetry.extras]
-com = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "fsspec", "boto3"]
-all = ["s3fs", "roman-datamodels", "astroquery", "python-dotenv", "pyarrow", "fsspec", "boto3"]
-
-# ── Console scripts ───────────────────────────────────────────────────────────
-[tool.poetry.scripts]
+[project.scripts]
 roman-com-cutout = "roman_cuts.com.cli:main"
 
-# ── Development dependencies ──────────────────────────────────────────────────
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0.0"
-ruff = ">=0.5,<0.12"
-mkdocs = "^1.6.0"
-mkdocs-material = "^9.5.0"
-mkdocstrings = {version = "^0.29.0", extras = ["python", "numpy-style"]}
-mkdocs-jupyter = "^0.25.1"
-mypy = "^1.15.0"
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0,<9.0",
+    "ruff>=0.11.0,<0.12",
+    "mypy>=1.15.0,<2.0",
+    "mkdocs>=1.6.0,<2.0",
+    "mkdocs-material>=9.5.0,<10.0",
+    "mkdocstrings[python]>=0.29.0,<0.30",
+    "mkdocs-jupyter>=0.25.1,<0.26",
+    "pymdown-extensions<10.15",
+]
+
+[tool.uv.sources]
+astroquery = { git = "https://github.com/astropy/astroquery.git", rev = "refs/pull/3593/head" }
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/roman_cuts"]
 
 [tool.ruff]
 target-version = "py311"

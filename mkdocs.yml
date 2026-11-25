@@ -6,15 +6,11 @@ nav:
       - "Commissioning (roman_cuts.com)": com.md
   - Tutorials:
       - "Simulation walkthrough": tutorial-sim.ipynb
-      - "Commissioning walkthrough": tutorial-com.ipynb
 
 extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/jorgemarpa
-  version:
-    provider: mike
-    default: stable
 
 copyright: Copyright &copy; 2025 Jorge Martinez-Palomera
 
@@ -64,8 +60,6 @@ plugins:
             show_root_members_full_path: false
             show_symbol_type_heading: true
             show_root_heading: true
-      watch:
-        - src/roman_cuts
 
 markdown_extensions:
   - pymdownx.highlight:
